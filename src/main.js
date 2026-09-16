@@ -4,7 +4,7 @@
 // the markup and the import map; the library (library/) holds every place.
 import * as THREE from 'three';
 import { buildBird, animateBird } from './birds.js';
-import { createParaglider, DEFAULT_PARAGLIDER } from './paraglider.js';
+import { animateParaglider, createParaglider, DEFAULT_PARAGLIDER } from './paraglider.js';
 import { plumageCatalog, paintMarking, plumageTile } from './plumage.js';
 import {
   WebGPURenderer,
@@ -2942,6 +2942,12 @@ function updateFlight(dt) {
 
   bird.position.set(state.x, state.y + Math.sin(state.t * 3.1) * DEFAULT_PARAGLIDER.bob, state.z);
   bird.rotation.set(-state.pitch, state.heading, state.bank);
+  animateParaglider(bird, dt, {
+    turnRate: state.yawRate + steerRate,
+    verticalRate: state.vy,
+    aim: state.aim * state.aimHold,
+    time: state.t,
+  });
 }
 
 // Pointer input follows the conventions of World of Warcraft's camera: the left
@@ -3881,6 +3887,7 @@ function frame(now) {
     updateClouds(state.x, state.z, 0);
     bird.position.set(state.x, state.y, state.z);
     bird.rotation.set(0, state.heading, 0);
+    animateParaglider(bird, dt, { time: state.t });
     updateCamera(dt);
     placeGrass(camera.position.x, camera.position.z);
     updateAtmosphere(0);
@@ -4074,6 +4081,7 @@ window.__fly = {
   obstacleFloor,
   dispose,
   step: (dt) => advance(dt, false),
+  animateParaglider: (dt, motion) => animateParaglider(bird, dt, motion),
   capture,
   surface: {
     cell: CELL,

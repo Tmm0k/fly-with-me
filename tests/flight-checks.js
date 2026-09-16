@@ -1255,7 +1255,8 @@ async function flightChecks() {
     const rig = z.objects.paraglider,
       parts = rig.userData.parts,
       colors = rig.userData.appearance.colors,
-      playerChildren = [...rig.children];
+      playerChildren = [...rig.children],
+      animationState = rig.userData.animation;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
         ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers'].every((name) => parts[name]),
@@ -1269,6 +1270,71 @@ async function flightChecks() {
       !rig.userData.wings && rig.children.every((child) => ['canopy', 'pilot', 'suspension-lines'].includes(child.name)),
       'the player hierarchy contains no bird body or wing anatomy',
     );
+    assert(typeof z.animateParaglider === 'function', 'the engine exposes the paraglider-specific maneuver animator');
+    const M4 = z.camera.matrixWorld.constructor,
+      V3 = z.camera.position.constructor;
+    const lineError = () => {
+      rig.updateWorldMatrix(true, true);
+      let worst = 0;
+      const instance = new M4(),
+        worldLine = new M4(),
+        low = new V3(),
+        high = new V3(),
+        from = new V3(),
+        to = new V3();
+      for (const record of parts.lineRecords) {
+        record.mesh.getMatrixAt(record.index, instance);
+        worldLine.multiplyMatrices(record.mesh.matrixWorld, instance);
+        low.set(0, -0.5, 0).applyMatrix4(worldLine);
+        high.set(0, 0.5, 0).applyMatrix4(worldLine);
+        record.from.getWorldPosition(from);
+        record.to.getWorldPosition(to);
+        worst = Math.max(worst, low.distanceTo(from), high.distanceTo(to));
+      }
+      return worst;
+    };
+    const brakeRecords = parts.lineRecords.filter((record) => record.mesh.name === 'brake-line-bundle');
+    const handHeight = (record) => parts.pilot.worldToLocal(record.from.getWorldPosition(new V3())).y;
+    for (let i = 0; i < 120; i++) z.animateParaglider(0.05, { time: i * 0.05 });
+    z.animateParaglider(0.05, { turnRate: 0.55, time: 6 });
+    assert(
+      Math.abs(parts.canopy.rotation.z) > Math.abs(parts.pilot.rotation.z) * 1.5,
+      'the canopy leads a turn before the suspended pilot follows',
+    );
+    for (let i = 1; i < 50; i++) z.animateParaglider(0.05, { turnRate: 0.55, time: 6 + i * 0.05 });
+    const leftPose = {
+      canopy: parts.canopy.rotation.z,
+      pilot: parts.pilot.rotation.z,
+      leftBrake: parts.leftForearm.rotation.x,
+      rightBrake: parts.rightForearm.rotation.x,
+      leftHand: handHeight(brakeRecords[0]),
+      rightHand: handHeight(brakeRecords[1]),
+    };
+    assert(
+      leftPose.canopy < -0.08 && leftPose.pilot < -0.12 && leftPose.leftBrake > leftPose.rightBrake + 0.25 && leftPose.leftHand < leftPose.rightHand,
+      'a left turn banks canopy and pilot left while lowering the left brake hand',
+    );
+    assert(lineError() < 0.001, 'suspension and brake lines remain joined during a left turn');
+    for (let i = 0; i < 70; i++) z.animateParaglider(0.05, { turnRate: -0.55, time: 9 + i * 0.05 });
+    assert(
+      parts.canopy.rotation.z > 0.08 &&
+        parts.pilot.rotation.z > 0.12 &&
+        parts.rightForearm.rotation.x > parts.leftForearm.rotation.x + 0.25 &&
+        handHeight(brakeRecords[1]) < handHeight(brakeRecords[0]),
+      'a right turn mirrors the bank, lean and brake-hand motion',
+    );
+    assert(lineError() < 0.001, 'suspension and brake lines remain joined during a right turn');
+    z.animateParaglider(0.05, { verticalRate: 11, aim: 0.3, time: 13 });
+    assert(parts.canopy.rotation.x !== 0 && parts.pilot.rotation.x !== 0, 'climb intent gives the canopy and suspended pilot a subtle relative pitch response');
+    for (let i = 0; i < 160; i++) z.animateParaglider(0.05, { time: 14 + i * 0.05 });
+    assert(
+      Math.abs(parts.canopy.rotation.z) < 0.015 &&
+        Math.abs(parts.pilot.rotation.z) < 0.015 &&
+        Math.abs(parts.leftForearm.rotation.x) < 0.015 &&
+        Math.abs(parts.rightForearm.rotation.x) < 0.015,
+      'released steering settles smoothly back toward neutral',
+    );
+    assert(lineError() < 0.001, 'dynamic lines remain attached after the rig settles');
     assert(!doc.getElementById('hud').inert && birdButton.textContent.includes(birds[0].name), 'after Begin the flock control is in reach and names the first kind');
     const before = z.objects.bird.position.clone();
     const perch = doc.getElementById('perch');
@@ -1301,8 +1367,10 @@ async function flightChecks() {
     );
     assert(z.objects.companions.every((b) => b.userData.kindId === birds[1].id), 'every companion uses the chosen flock kind');
     assert(
-      z.objects.bird.position.distanceTo(before) < 0.000001 && playerChildren.every((child, i) => z.objects.bird.children[i] === child),
-      'changing the flock leaves the paraglider intact and where it was',
+      z.objects.bird.position.distanceTo(before) < 0.000001 &&
+        playerChildren.every((child, i) => z.objects.bird.children[i] === child) &&
+        z.objects.bird.userData.animation === animationState,
+      'changing the flock leaves the paraglider animation and hierarchy intact and where it was',
     );
     const pivot = z.objects.companions[0].userData.wings[0].pivots[0],
       hinge = pivot.rotation.z;
