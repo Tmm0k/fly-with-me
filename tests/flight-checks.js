@@ -680,6 +680,14 @@ async function flightChecks() {
   );
   canvas.dispatchEvent(new win.WheelEvent('wheel', { deltaY: 300, bubbles: true, cancelable: true }));
   assert(z.cam.dist > orbit.dist, 'the wheel zooms the camera out');
+  const usefulZoom = z.cam.dist;
+  for (let i = 0; i < 12; i++)
+    canvas.dispatchEvent(new win.WheelEvent('wheel', { deltaY: -1000, bubbles: true, cancelable: true }));
+  assert(z.cam.dist === 16, 'zooming in stops where the full paraglider remains useful in frame');
+  for (let i = 0; i < 12; i++)
+    canvas.dispatchEvent(new win.WheelEvent('wheel', { deltaY: 1000, bubbles: true, cancelable: true }));
+  assert(z.cam.dist === 40, 'zooming out keeps the established world-view limit');
+  z.cam.dist = usefulZoom;
   const headingBefore = z.state.heading;
   let wandered = 0;
   pointer('pointerdown', 100, 100, 2);

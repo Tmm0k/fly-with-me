@@ -3062,7 +3062,7 @@ function obstacleFloor(x, z) {
 const CAMERA = {
   dist: 17,
   pitch: 0.3, // elevation above the bird, radians
-  minDist: 9,
+  minDist: 16, // keep the full canopy readable at the closest framing
   maxDist: 40,
   minPitch: -0.5,
   maxPitch: 1.2,
