@@ -66,22 +66,54 @@ function geometryFromQuads(THREE, quads) {
   return geometry;
 }
 
-function canopyPaint(colors, u, v) {
-  if (Math.abs(u) > 0.79 || (v < 0.12 && Math.abs(u) > 0.28)) return colors.canopySecondary;
+function geometryFromTriangles(THREE, triangles) {
+  const positions = [];
+  const colors = [];
+  for (const { points, color } of triangles) {
+    const c = new THREE.Color(color);
+    for (const point of points) {
+      positions.push(...point);
+      colors.push(c.r, c.g, c.b);
+    }
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
+function canopyPaint(colors, v) {
+  if (v < 2 / 12) return colors.canopySecondary;
+  if (v < 4 / 12) return colors.canopyPattern;
   return colors.canopyPrimary;
 }
 
 function buildCanopyGeometry(THREE, colors) {
-  const spanSteps = 28;
-  const chordSteps = 8;
+  const cellCount = 28;
+  const spanSteps = cellCount * 2;
+  const chordSteps = 12;
   const halfSpan = 5.1;
   const point = (u, v, upper) => {
     const tip = Math.abs(u);
-    const chord = 2.75 * (1 - 0.62 * tip ** 2.7);
-    const arc = 5.55 - 1.72 * tip ** 1.65;
-    const sweep = -0.4 * tip ** 2;
-    const crown = Math.sin(Math.PI * v);
-    return [halfSpan * u, arc + (upper ? 0.16 + crown * 0.28 : -0.16 - crown * 0.07), sweep + (0.5 - v) * chord];
+    const chord = 2.9 * (1 - 0.67 * tip ** 2.6 - 0.25 * tip ** 7);
+    const arc = 5.65 - 1.75 * tip ** 1.65 - 0.28 * tip ** 6;
+    const sweep = -0.38 * tip ** 2;
+    const airfoil = Math.sin(Math.PI * v ** 0.72);
+    const nose = (1 - v) ** 0.55;
+    const tipVolume = 0.5 + 0.5 * (1 - tip ** 8);
+    const thickness = (0.12 * nose + 0.27 * airfoil) * tipVolume;
+    const camber = 0.12 * Math.sin(Math.PI * v) * (1 - 0.35 * tip);
+    // Whole cell coordinates are seams; half coordinates crown each chamber.
+    const cellPosition = (u + 1) * cellCount * 0.5;
+    const cellPhase = cellPosition - Math.floor(cellPosition);
+    const inflation = Math.sin(Math.PI * cellPhase) ** 1.6 *
+      (0.035 * (1 - v) ** 0.8 + 0.045 * airfoil) * (1 - 0.55 * tip ** 5);
+    return [
+      halfSpan * Math.sin((Math.PI * u) / 2),
+      arc + camber + (upper ? thickness + inflation : -thickness * 0.72 - inflation * 0.28),
+      sweep + (0.5 - v) * chord + 0.055 * Math.sin(Math.PI * cellPhase) ** 2 * (1 - v) ** 2,
+    ];
   };
   const quads = [];
   for (let i = 0; i < spanSteps; i++) {
@@ -94,16 +126,16 @@ function buildCanopyGeometry(THREE, colors) {
       const v = (v0 + v1) * 0.5;
       quads.push({
         points: [point(u0, v0, true), point(u1, v0, true), point(u1, v1, true), point(u0, v1, true)],
-        color: canopyPaint(colors, u, v),
+        color: canopyPaint(colors, v),
       });
       quads.push({
         points: [point(u0, v0, false), point(u1, v0, false), point(u1, v1, false), point(u0, v1, false)],
-        color: canopyPaint(colors, u, v),
+        color: canopyPaint(colors, v),
         flip: true,
       });
     }
     for (const v of [0, 1]) {
-      const color = v === 0 && i % 2 === 0 ? colors.canopySecondary : colors.canopyPrimary;
+      const color = v === 0 ? colors.canopySecondary : colors.canopyPrimary;
       quads.push({
         points: [point(u0, v, false), point(u1, v, false), point(u1, v, true), point(u0, v, true)],
         color,
@@ -117,40 +149,43 @@ function buildCanopyGeometry(THREE, colors) {
       const v1 = (j + 1) / chordSteps;
       quads.push({
         points: [point(u, v0, false), point(u, v1, false), point(u, v1, true), point(u, v0, true)],
-        color: colors.canopySecondary,
+        color: canopyPaint(colors, (v0 + v1) * 0.5),
         flip: u < 0,
       });
     }
   }
-  return { geometry: geometryFromQuads(THREE, quads), point };
-}
-
-function buildCanopyMarkingGeometry(THREE, color, point) {
-  const strokes = [
-    [[-0.68, 0.78], [-0.68, 0.2]],
-    [[-0.68, 0.2], [0, 0.62]],
-    [[0, 0.62], [0.68, 0.2]],
-    [[0.68, 0.2], [0.68, 0.78]],
-  ];
-  const quads = [];
-  for (const [[ax, ay], [bx, by]] of strokes) {
-    const dx = bx - ax;
-    const dy = by - ay;
-    const len = Math.hypot(dx, dy);
-    const px = (-dy / len) * 0.085;
-    const py = (dx / len) * 0.085;
-    for (const upper of [true, false]) {
-      const corners = [
-        point(ax + px, ay + py, upper),
-        point(bx + px, by + py, upper),
-        point(bx - px, by - py, upper),
-        point(ax - px, ay - py, upper),
-      ];
-      for (const p of corners) p[1] += upper ? 0.012 : -0.012;
-      quads.push({ points: corners, color, flip: !upper });
+  const openings = [];
+  const openingSegments = 10;
+  for (let cell = 0; cell < cellCount; cell++) {
+    const u = -1 + ((cell + 0.5) * 2) / cellCount;
+    const upper = point(u, 0, true);
+    const lower = point(u, 0, false);
+    const center = [upper[0], (upper[1] + lower[1]) * 0.5, (upper[2] + lower[2]) * 0.5 + 0.012];
+    const perimeter = [];
+    for (let segment = 0; segment < openingSegments; segment++) {
+      const angle = (segment / openingSegments) * Math.PI * 2;
+      const edgeU = u + (Math.cos(angle) * 0.62) / cellCount;
+      const edgeUpper = point(edgeU, 0, true);
+      const edgeLower = point(edgeU, 0, false);
+      perimeter.push([
+        (edgeUpper[0] + edgeLower[0]) * 0.5,
+        (edgeUpper[1] + edgeLower[1]) * 0.5 + Math.sin(angle) * (upper[1] - lower[1]) * 0.29,
+        (edgeUpper[2] + edgeLower[2]) * 0.5 + 0.014,
+      ]);
+    }
+    for (let segment = 0; segment < openingSegments; segment++) {
+      openings.push({
+        points: [center, perimeter[segment], perimeter[(segment + 1) % openingSegments]],
+        color: colors.canopyPattern,
+      });
     }
   }
-  return geometryFromQuads(THREE, quads);
+  return {
+    geometry: geometryFromQuads(THREE, quads),
+    openings: geometryFromTriangles(THREE, openings),
+    point,
+    cellCount,
+  };
 }
 
 function strut(THREE, from, to, radius, sides = 7) {
@@ -287,15 +322,12 @@ export function createParaglider(appearance, kit) {
   const canopy = new THREE.Group();
   canopy.name = 'canopy';
   const canopyBuilt = buildCanopyGeometry(THREE, colors);
-  canopy.add(mesh(THREE, canopyBuilt.geometry, material, 'canopy-surface'));
-  const marking = mesh(
-    THREE,
-    buildCanopyMarkingGeometry(THREE, colors.canopyPattern, canopyBuilt.point),
-    material,
-    'canopy-m-pattern',
-  );
-  marking.castShadow = false;
-  canopy.add(marking);
+  const canopySurface = mesh(THREE, canopyBuilt.geometry, material, 'canopy-surface');
+  canopySurface.userData.cellCount = canopyBuilt.cellCount;
+  const cellOpenings = mesh(THREE, canopyBuilt.openings, material, 'canopy-cell-openings');
+  cellOpenings.userData.cellCount = canopyBuilt.cellCount;
+  cellOpenings.castShadow = false;
+  canopy.add(canopySurface, cellOpenings);
   rig.add(canopy);
 
   const pilot = new THREE.Group();
@@ -408,20 +440,28 @@ export function createParaglider(appearance, kit) {
 
   const lines = new THREE.Group();
   lines.name = 'suspension-lines';
-  const suspensionLines = lineMesh(THREE, merge, material, colors.harness, 0.011, 8, 'suspension-line-bundle');
+  const suspensionLines = lineMesh(THREE, merge, material, colors.harness, 0.011, 12, 'suspension-line-bundle');
   const brakeLines = lineMesh(THREE, merge, material, colors.canopyPattern, 0.009, 2, 'brake-line-bundle');
   lines.add(suspensionLines, brakeLines);
   rig.add(lines);
 
   const lineRecords = [];
   let suspensionIndex = 0;
+  const suspensionPlan = [
+    [5 / 28, 0.44],
+    [9 / 28, 0.58],
+    [13 / 28, 0.47],
+    [17 / 28, 0.62],
+    [21 / 28, 0.5],
+    [25 / 28, 0.58],
+  ];
   for (let sideIndex = 0; sideIndex < 2; sideIndex++) {
     const side = sideIndex === 0 ? -1 : 1;
-    for (const [u, v] of [[0.2, 0.7], [0.46, 0.58], [0.72, 0.46], [0.9, 0.36]]) {
+    for (const [u, v] of suspensionPlan) {
       const top = anchor(
         THREE,
         canopy,
-        `${side < 0 ? 'left' : 'right'}-suspension-${suspensionIndex % 4}`,
+        `${side < 0 ? 'left' : 'right'}-suspension-${suspensionIndex % 6}`,
         canopyBuilt.point(side * u, v, false),
       );
       lineRecords.push({ mesh: suspensionLines, index: suspensionIndex++, from: riserAnchors[sideIndex], to: top });
@@ -430,7 +470,7 @@ export function createParaglider(appearance, kit) {
       THREE,
       canopy,
       `${side < 0 ? 'left' : 'right'}-brake-canopy`,
-      canopyBuilt.point(side * 0.58, 0.94, false),
+      canopyBuilt.point(side * (21 / 28), 0.94, false),
     );
     lineRecords.push({
       mesh: brakeLines,
@@ -452,6 +492,8 @@ export function createParaglider(appearance, kit) {
     risers,
     head,
     shoes,
+    canopySurface,
+    cellOpenings,
     lineRecords,
     lineMeshes: [suspensionLines, brakeLines],
   };

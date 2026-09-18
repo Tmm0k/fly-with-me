@@ -1288,6 +1288,25 @@ async function flightChecks() {
       !rig.userData.wings && rig.children.every((child) => ['canopy', 'pilot', 'suspension-lines'].includes(child.name)),
       'the player hierarchy contains no bird body or wing anatomy',
     );
+    const canopySurface = parts.canopySurface,
+      cellOpenings = parts.cellOpenings;
+    canopySurface.geometry.computeBoundingBox();
+    const canopySpan = canopySurface.geometry.boundingBox.max.x - canopySurface.geometry.boundingBox.min.x;
+    assert(
+      canopySurface.name === 'canopy-surface' && cellOpenings.name === 'canopy-cell-openings' &&
+        canopySurface.userData.cellCount >= 24 &&
+        cellOpenings.geometry.attributes.position.count === canopySurface.userData.cellCount * 10 * 3,
+      'the canopy surface carries repeated inflated cells and one rounded intake opening per cell',
+    );
+    assert(canopySpan >= 10 && canopySpan <= 10.3, 'the refined canopy remains inside the established gameplay span');
+    assert(!parts.canopy.getObjectByName('canopy-m-pattern'), 'the obsolete M marking is absent from the refined canopy');
+    const suspensionRecords = parts.lineRecords.filter((record) => record.mesh.name === 'suspension-line-bundle'),
+      canopyBrakeRecords = parts.lineRecords.filter((record) => record.mesh.name === 'brake-line-bundle');
+    assert(
+      suspensionRecords.length === 12 && canopyBrakeRecords.length === 2 &&
+        canopyBrakeRecords.every((record) => record.to.position.z < Math.min(...suspensionRecords.map((line) => line.to.position.z))),
+      'six suspension attachments per half-wing converge on the risers while brake lines reach the trailing edge',
+    );
     assert(typeof z.animateParaglider === 'function', 'the engine exposes the paraglider-specific maneuver animator');
     const M4 = z.camera.matrixWorld.constructor,
       V3 = z.camera.position.constructor;
@@ -1311,7 +1330,7 @@ async function flightChecks() {
       }
       return worst;
     };
-    const brakeRecords = parts.lineRecords.filter((record) => record.mesh.name === 'brake-line-bundle');
+    const brakeRecords = canopyBrakeRecords;
     const handHeight = (record) => parts.pilot.worldToLocal(record.from.getWorldPosition(new V3())).y;
     for (let i = 0; i < 120; i++) z.animateParaglider(0.05, { time: i * 0.05 });
     z.animateParaglider(0.05, { turnRate: 0.55, time: 6 });
@@ -1370,6 +1389,10 @@ async function flightChecks() {
       input.value = value;
       input.dispatchEvent(new win.Event('input', { bubbles: true }));
     };
+    const originalCanopyGeometry = parts.canopySurface.geometry;
+    chooseColor('canopyPrimary', '#62d347');
+    chooseColor('canopySecondary', '#d8ebf2');
+    chooseColor('canopyPattern', '#293140');
     chooseColor('jacket', '#315a7d');
     chooseColor('shoes', '#e7d36f');
     parts = rig.userData.parts;
@@ -1379,6 +1402,13 @@ async function flightChecks() {
       z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.shoes === 0xe7d36f &&
         rig.userData.appearance.colors.jacket === 0x315a7d && rig.userData.animation === animationState,
       'appearance controls recolor the visible rig without replacing its pivot or maneuver state',
+    );
+    assert(
+      z.appearance.colors.canopyPrimary === 0x62d347 && z.appearance.colors.canopySecondary === 0xd8ebf2 &&
+        z.appearance.colors.canopyPattern === 0x293140 && parts.canopySurface.geometry !== originalCanopyGeometry &&
+        parts.canopySurface.userData.cellCount === canopySurface.userData.cellCount &&
+        !parts.canopy.getObjectByName('canopy-m-pattern'),
+      'primary, secondary and pattern controls rebuild the same refined cells and transition band without restoring the M graphic',
     );
     assert(parts.shoes !== undefined && parts.shoes.children.length === 2, 'appearance rebuilding retains the modeled shoes');
     for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
