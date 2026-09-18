@@ -11,7 +11,7 @@ It is never meant to be their focus, and it never asks to become it: no goal, no
 Most of the time it is do nothing and watch; the actions the page invites are actively kept to the fewest possible.
 They ride a bird, because a bird is the one point of view that crosses forests, deserts, coasts and mountains, rises above the clouds and drops back under them, without the scene ever explaining itself.
 The flight is slow, continuous and quiet; most of the time nothing happens, on purpose, and a rare moment lands because it is rare.
-The flight is mostly alone, and meant to feel so; now and then company comes, a flock for a while, one day perhaps another person's bird in the same sky, and the companionship is pleasant because it is occasional and asks nothing of either of them, not even a wave.
+The flight is alone, and meant to feel so. Wildlife may belong to the world one day, but it should not form a personal escort that follows the player.
 The world is never the same twice and always makes sense: coasts look like coasts, forests thin toward the snow line, and the ruins of an older world are found, never announced.
 Whatever brings the reality and diversity of real nature into the world is welcome, weather included.
 A day passes in minutes, not hours, with dawn and dusk given their time and a dark night full of stars, so one sitting sees all of it; the world's diversity is there to be experienced, not waited for.

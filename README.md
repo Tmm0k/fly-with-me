@@ -40,7 +40,6 @@
 
 - The page opens on a white veil, then stands still behind one **Begin** button; nothing moves and no sound plays until you press it. Sound is synthesized in the browser, with an on/off switch and a volume slider that starts at half. The controls dim after a few idle seconds and brighten as soon as you point at, touch, or focus them.
 - Do nothing and the paraglider flies itself. Drag with the left button to orbit it, and the view stays where you leave it; drag with the right button to steer, up and down as well, and the paraglider flies where you look. The wheel zooms, touch steers, and the arrow keys nudge a turn or a climb that fades after a few seconds.
-- The corner control opens a perch for the companion flock: choose gulls, eagles, swallows, cranes or owls, then one of sixteen plumages. The flock that joins now and then uses that choice, which the page remembers.
 - **Pause**, or space with the canvas focused, stops the flight and the sound together. A reduced-motion preference starts the page paused.
 - The page remembers your sound settings, your framing, and the paraglider's exact place, course and time of day, and resumes there after Begin. `?seed=<number>` in the address opens that world fresh. The resolved seed is always written into the address so a copied URL opens the same world, and the share link carries it.
 - WebGPU is used when available, over HTTPS or localhost; `?webgl=1` forces WebGL2, and the desktop corner names the backend.

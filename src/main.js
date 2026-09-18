@@ -3,7 +3,6 @@
 // says stands here, a paraglider, a camera and a day. The page (index.html) holds
 // the markup and the import map; the library (library/) holds every place.
 import * as THREE from 'three';
-import { buildBird, animateBird } from './birds.js';
 import {
   animateParaglider,
   createParaglider,
@@ -12,7 +11,6 @@ import {
   normalizeParagliderAppearance,
   PARAGLIDER_COLOR_KEYS,
 } from './paraglider.js';
-import { plumageCatalog, paintMarking, plumageTile } from './plumage.js';
 import {
   WebGPURenderer,
   MeshStandardNodeMaterial,
@@ -305,16 +303,11 @@ const FOG_DENSITY = L.fogDensity;
 const BIOMES = registry.biomes,
   SPECIES = Object.fromEntries(registry.species.map((entry) => [entry.id, entry])),
   RUINS = registry.ruins,
-  PROPS = registry.props,
-  BIRDS = registry.birds,
-  BIRD = Object.fromEntries(BIRDS.map((entry) => [entry.id, entry]));
+  PROPS = registry.props;
 {
   const errors = validateLibrary(registry);
   if (errors.length) throw new Error('scenery library: ' + errors.join('; '));
 }
-// Every kind in its own colors and in every plumage: the catalog the perch shows.
-const PLUMAGES = registry.plumages,
-  catalog = plumageCatalog(registry);
 // How rare the sites are: one site cell in this many carries a site, before
 // the biome's welcome. Cells are SITE_CELL meters wide.
 const SITE_CELL = 1200,
@@ -2344,121 +2337,19 @@ cloudSea.renderOrder = 2;
 scene.add(cloudSea);
 
 // ---------------------------------------------------------------------------
-// Player and birds. The player is a procedural paraglider rig whose root is
-// still the flight pivot. Every kind in library/birds/ remains data over the bird kit in
-// src/birds.js: a body and two wings of three hinged segments with painted
-// primaries, and a flight profile the hinges follow. The engine makes the
-// meshes, lights them with its own soft material, measures each kind against
-// its budget by name, and uses them for the companion flock. The corner perch
-// chooses that flock's kind and plumage and remembers it with the settings.
+// Player. The procedural paraglider rig is the flight pivot and the only
+// player-following subject in the scene. Bird entries remain validated library
+// content, but normal flight does not instantiate a personal flock.
 // ---------------------------------------------------------------------------
-const birdMaterial = propMaterial({ basic: { side: THREE.DoubleSide } });
-const birdKit = { THREE, merge: mergeParts, M };
-const paragliderKit = { ...birdKit, material: birdMaterial };
+const playerMaterial = propMaterial({ basic: { side: THREE.DoubleSide } });
+const paragliderKit = { THREE, merge: mergeParts, M, material: playerMaterial };
 let paragliderAppearance = normalizeParagliderAppearance(storedSettings.paraglider);
-let birdKindId = BIRD[storedSettings.bird] ? storedSettings.bird : BIRDS[0].id;
-// The plumage is a second remembered field; null is the kind's own colors.
-let plumageId = catalog.has(storedSettings.plumage) ? storedSettings.plumage : null;
-const birdsMeasured = new Set();
-function dressBird(g, kindId, size = 1, plumage = plumageId) {
-  for (const child of [...g.children]) {
-    g.remove(child);
-    child.traverse((o) => o.isMesh && o.geometry.dispose());
-  }
-  const kind = BIRD[kindId];
-  // the kind in this plumage: recolored data for the kit, then the marking painted over
-  const variant = catalog.variantOf(kind, plumage);
-  const built = paintMarking(buildBird(variant.kind, birdKit), kind, variant.marking, variant.plumage?.accent);
-  if (!birdsMeasured.has(variant.id)) {
-    // one kind is one budget: body and wings together, judged by entry name
-    const whole = mergeParts([{ geometry: built.body }, ...built.wings.flatMap((w) => w.segments.map((seg) => ({ geometry: seg.geometry })))]);
-    const errors = validateBaked(kind, whole);
-    whole.dispose();
-    if (errors.length) throw new Error('scenery library: ' + errors.join('; '));
-    birdsMeasured.add(variant.id);
-  }
-  g.add(new THREE.Mesh(built.body, birdMaterial));
-  const wings = [];
-  for (const wing of built.wings) {
-    let parent = g;
-    const pivots = [];
-    for (const seg of wing.segments) {
-      const pivot = new THREE.Group();
-      pivot.position.set(...seg.at);
-      pivot.add(new THREE.Mesh(seg.geometry, birdMaterial));
-      parent.add(pivot);
-      pivots.push(pivot);
-      parent = pivot;
-    }
-    wings.push({ s: wing.s, pivots });
-  }
-  g.traverse((o) => {
-    if (o.isMesh) {
-      o.castShadow = true;
-      o.receiveShadow = true;
-    }
-  });
-  g.scale.setScalar((kind.scale ?? 1) * size);
-  g.userData.kind = kind;
-  g.userData.kindId = kindId;
-  g.userData.variant = variant;
-  g.userData.wings = wings;
-  g.userData.phase = Math.random() * 6.28;
-  g.userData.flapAmp = 0.1;
-  return g;
-}
-function makeBird(kindId, size = 1, plumage = plumageId) {
-  const g = new THREE.Group();
-  dressBird(g, kindId, size, plumage);
-  g.rotation.order = 'YXZ';
-  return g;
-}
-const animateWings = animateBird;
 // Keep the long-standing `bird` name for the engine's player pivot and public
 // review API. Its visible children are exclusively the paraglider rig.
 const bird = createParaglider(paragliderAppearance, paragliderKit);
-bird.userData.kind = BIRD[birdKindId];
-bird.userData.kindId = birdKindId;
-bird.userData.variant = catalog.variantOf(BIRD[birdKindId], plumageId);
 scene.add(bird);
 // How far the seated pilot hangs under the flight pivot, in world meters.
 const birdBelow = () => DEFAULT_PARAGLIDER.below;
-
-// companions for the flock moments, always the bird's own kind
-const companions = [];
-for (let i = 0; i < 5; i++) {
-  const b = makeBird(birdKindId, BIRD[birdKindId].flock.scale, catalog.flock(plumageId, i));
-  b.visible = false;
-  scene.add(b);
-  companions.push(b);
-}
-// The viewer's choice dresses the companion flock. Player metadata follows it
-// for persistence and the stable review API, but the paraglider geometry stays
-// intact and no bird anatomy is attached to the player.
-function setBirdKind(kindId, plumage = plumageId) {
-  if (!BIRD[kindId]) throw new Error('unknown bird: ' + kindId);
-  if (plumage !== null && !catalog.has(plumage)) throw new Error('unknown plumage: ' + plumage);
-  birdKindId = kindId;
-  plumageId = plumage;
-  bird.userData.kind = BIRD[kindId];
-  bird.userData.kindId = kindId;
-  bird.userData.variant = catalog.variantOf(BIRD[kindId], plumage);
-  // the flock is the bird's kind, in its plumage with a real flock's drift
-  companions.forEach((b, i) => dressBird(b, kindId, BIRD[kindId].flock.scale, catalog.flock(plumage, i)));
-  showBird();
-  saveSettings();
-  if (!running || paused) {
-    last = performance.now();
-    renderer.setAnimationLoop(frame);
-  }
-}
-const formation = [
-  [-9, -1, -7],
-  [9, -1.5, -7],
-  [-17, 1, -14],
-  [17, 0.5, -14],
-  [-25, 2, -21],
-];
 
 // ---------------------------------------------------------------------------
 // Sky events. While the sun or the moon crosses the horizon the bird turns to
@@ -3119,50 +3010,6 @@ function updateCamera(dt) {
 }
 
 // ---------------------------------------------------------------------------
-// Moments: rare, scheduled, with cooldowns. For now: a flock that joins and
-// leaves. Cloud crossings come from the altitude schedule.
-// ---------------------------------------------------------------------------
-const moments = { nextFlock: 75, flockStarted: 0, flockUntil: 0, flockOn: false };
-function updateMoments(dt, sound = true) {
-  if (!moments.flockOn && state.t > moments.nextFlock) {
-    moments.flockOn = true;
-    moments.flockStarted = state.t;
-    moments.flockUntil = state.t + 70 + Math.random() * 30;
-    if (sound) audio.chime(2);
-  }
-  if (moments.flockOn && state.t > moments.flockUntil) {
-    moments.flockOn = false;
-    moments.nextFlock = state.t + 95 + Math.random() * 50;
-  }
-  const fx = Math.sin(state.heading),
-    fz = Math.cos(state.heading),
-    rx = Math.cos(state.heading),
-    rz = -Math.sin(state.heading);
-  companions.forEach((b, i) => {
-    const f = formation[i];
-    // ease in from far behind and below; ease out the same way
-    const tIn = Math.min(1, Math.max(0, (state.t - moments.flockStarted) / 14));
-    const tOut = moments.flockOn ? 1 : Math.max(0, 1 - (state.t - moments.flockUntil) / 14);
-    const a = moments.flockStarted > 0 ? Math.min(tIn, tOut) : 0;
-    b.visible = a > 0.01;
-    if (!b.visible) return;
-    const ease = 1 - Math.pow(1 - a, 3);
-    const back = (1 - ease) * 140;
-    const flock = bird.userData.kind.flock,
-      spread = flock.spread ?? 1;
-    const wob = n1(state.t * 0.3 + i * 7.7, S3 + i) * 3 * (flock.wobble ?? 1);
-    b.position.set(
-      state.x + rx * f[0] * spread + fx * (f[2] * spread - back),
-      state.y + f[1] - (1 - ease) * 40 + wob,
-      state.z + rz * f[0] * spread + fz * (f[2] * spread - back),
-    );
-    b.position.y = Math.max(b.position.y, obstacleFloor(b.position.x, b.position.z) + 6);
-    b.rotation.set(-state.pitch * 0.8, state.heading, state.bank * 0.9);
-    animateWings(b, dt, state.flapping || (i % 2 === 0 && state.flapBurst > 0), 0.9 + i * 0.05);
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Sound: everything synthesized. Wind that follows altitude and speed, water
 // near the ocean, a pentatonic chime now and then, a soft brush per wing beat.
 // ---------------------------------------------------------------------------
@@ -3399,147 +3246,20 @@ function saveSettings() {
     volume: audio.volume,
     muted: audio.muted,
     camera: { yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist },
-    bird: birdKindId,
-    plumage: plumageId,
     paraglider: { colors: { ...paragliderAppearance.colors } },
   });
 }
 // ---------------------------------------------------------------------------
-// The perch: the corner control opens two strips, the companion kinds' shapes
-// over their colors - each kind's own colors first, then every plumage. A pick
-// dresses the flock and is remembered; picking a kind keeps the plumage and
-// refreshes the lower strip. An ordinary
-// vertical wheel scrolls a strip sideways, with no modifier key. The perch
-// closes by itself, on Escape, or on a click anywhere else. Inert until Begin.
+// The appearance modal changes only the visible paraglider while retaining the
+// engine-owned player pivot and its maneuver state.
 // ---------------------------------------------------------------------------
-const birdButton = document.getElementById('birdBtn'),
-  perch = document.getElementById('perch'),
-  kindStrip = document.getElementById('perchKinds'),
-  plumageStrip = document.getElementById('perchPlumages'),
-  appearanceButton = document.getElementById('appearanceBtn'),
+const appearanceButton = document.getElementById('appearanceBtn'),
   appearancePanel = document.getElementById('appearance'),
   appearanceClose = document.getElementById('appearanceClose'),
   appearanceInputs = [...document.querySelectorAll('[data-paraglider-color]')],
   appearancePreviewColors = [...document.querySelectorAll('[data-preview-color]')],
   appearancePreviewStrokes = [...document.querySelectorAll('[data-preview-stroke]')],
-  skinPresets = [...document.querySelectorAll('[data-skin-preset]')],
-  hudLine = document.getElementById('hud');
-const kindTiles = new Map(),
-  tiles = new Map();
-let shownKindId = null;
-const makeTile = (label, className = 'tile') => {
-  const tile = document.createElement('button');
-  tile.type = 'button';
-  tile.className = className;
-  tile.title = label;
-  tile.setAttribute('aria-label', label);
-  return tile;
-};
-// The strips are built the first time the perch opens: a few dozen inline
-// tiles are not worth paying for on a visit that never looks.
-function buildPerch() {
-  if (kindTiles.size) return;
-  for (const kind of BIRDS) {
-    const tile = makeTile(`Fly as ${/^[aeiou]/i.test(kind.name) ? 'an' : 'a'} ${kind.name}`);
-    tile.dataset.kind = kind.id;
-    tile.innerHTML = plumageTile(catalog.variantOf(kind, null)) + `<span class="name">${kind.name}</span>`;
-    tile.addEventListener('click', () => {
-      setBirdKind(kind.id, plumageId);
-      armPerchIdle();
-    });
-    kindStrip.append(tile);
-    kindTiles.set(kind.id, tile);
-  }
-  showBird();
-}
-// The lower strip is the one kind's colors, rebuilt whenever the kind changes.
-function buildPlumages(kind) {
-  shownKindId = kind.id;
-  tiles.clear();
-  plumageStrip.replaceChildren();
-  for (const v of catalog.variants) {
-    if (v.base !== kind) continue;
-    const tile = makeTile(v.plumage ? `${v.name}, ${v.marking.id}` : `${v.name}, its own colors`, 'tile' + (v.plumage ? '' : ' own'));
-    tile.dataset.variant = v.id;
-    tile.innerHTML = plumageTile(v);
-    tile.addEventListener('click', () => {
-      setBirdKind(v.base.id, v.plumage?.id ?? null);
-      armPerchIdle();
-    });
-    plumageStrip.append(tile);
-    tiles.set(v.id, tile);
-  }
-}
-function showBird() {
-  birdButton.textContent = 'flock: ' + BIRD[birdKindId].name;
-  if (!kindTiles.size) return;
-  for (const [id, tile] of kindTiles) tile.setAttribute('aria-pressed', String(id === birdKindId));
-  if (shownKindId !== birdKindId) buildPlumages(BIRD[birdKindId]);
-  const current = bird.userData.variant.id;
-  for (const [id, tile] of tiles) tile.setAttribute('aria-pressed', String(id === current));
-  markOverflow();
-}
-showBird();
-// What is out of sight on a strip is told twice: the edge it can still be
-// scrolled toward fades, and its rail shows how much is in view and where.
-// A strip that fits fades neither edge and has no rail.
-function markOverflow() {
-  for (const strip of [kindStrip, plumageStrip]) {
-    const max = strip.scrollWidth - strip.clientWidth,
-      rail = strip.nextElementSibling;
-    strip.dataset.overflow = max < 1 ? '' : [strip.scrollLeft > 1 ? 'start' : '', strip.scrollLeft < max - 1 ? 'end' : ''].filter(Boolean).join(' ');
-    rail.classList.toggle('on', max >= 1);
-    rail.firstElementChild.style.width = `${((100 * strip.clientWidth) / strip.scrollWidth).toFixed(2)}%`;
-    rail.firstElementChild.style.marginLeft = `${((100 * strip.scrollLeft) / strip.scrollWidth).toFixed(2)}%`;
-  }
-}
-// A vertical wheel or trackpad swipe moves an overflowing strip sideways, so
-// the colors need no shift key; a native horizontal swipe is left to scroll.
-const WHEEL_LINE = 16;
-function wheelStrip(e) {
-  const strip = e.currentTarget,
-    max = strip.scrollWidth - strip.clientWidth;
-  if (max < 1 || !e.deltaY || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-  const step = e.deltaMode === 1 ? e.deltaY * WHEEL_LINE : e.deltaMode === 2 ? e.deltaY * strip.clientWidth : e.deltaY;
-  const before = strip.scrollLeft;
-  strip.scrollLeft = Math.max(0, Math.min(max, before + step));
-  if (strip.scrollLeft !== before) e.preventDefault();
-}
-for (const strip of [kindStrip, plumageStrip]) {
-  strip.addEventListener('wheel', wheelStrip, { passive: false });
-  strip.addEventListener('scroll', markOverflow, { passive: true });
-}
-let perchIdle = 0;
-const PERCH_IDLE_MS = 7000;
-function armPerchIdle() {
-  clearTimeout(perchIdle);
-  perchIdle = setTimeout(closePerch, PERCH_IDLE_MS);
-}
-// The perch sits just above the controls line, however many lines that wraps to.
-function placePerch() {
-  perch.style.bottom = `${Math.round(window.innerHeight - hudLine.getBoundingClientRect().top + 8)}px`;
-}
-function openPerch() {
-  if (perch.classList.contains('open')) return;
-  closeAppearance(false);
-  buildPerch();
-  placePerch();
-  perch.inert = false;
-  perch.classList.add('open');
-  birdButton.setAttribute('aria-expanded', 'true');
-  showBird();
-  kindTiles.get(birdKindId)?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  tiles.get(bird.userData.variant.id)?.scrollIntoView({ block: 'nearest', inline: 'center' });
-  markOverflow();
-  armPerchIdle();
-}
-function closePerch() {
-  clearTimeout(perchIdle);
-  if (!perch.classList.contains('open')) return;
-  perch.classList.remove('open');
-  perch.inert = true;
-  birdButton.setAttribute('aria-expanded', 'false');
-}
+  skinPresets = [...document.querySelectorAll('[data-skin-preset]')];
 const colorHex = (color) => `#${color.toString(16).padStart(6, '0')}`;
 function showAppearance() {
   for (const input of appearanceInputs) input.value = colorHex(paragliderAppearance.colors[input.dataset.paragliderColor]);
@@ -3564,7 +3284,6 @@ function setParagliderColor(key, value) {
 }
 function openAppearance() {
   if (appearancePanel.classList.contains('open')) return;
-  closePerch();
   showAppearance();
   endDrag();
   appearanceInputBlocked = true;
@@ -3585,7 +3304,6 @@ function closeAppearance(restoreFocus = true) {
   canvas.inert = !running;
   if (restoreFocus) appearanceButton.focus();
 }
-birdButton.addEventListener('click', () => (perch.classList.contains('open') ? closePerch() : openPerch()));
 appearanceButton.addEventListener('click', () =>
   appearancePanel.classList.contains('open') ? closeAppearance() : openAppearance(),
 );
@@ -3599,13 +3317,8 @@ appearancePanel.addEventListener('pointerdown', (e) => {
   if (e.target === appearancePanel) closeAppearance();
 });
 showAppearance();
-for (const type of ['pointermove', 'pointerdown', 'focusin', 'wheel']) perch.addEventListener(type, armPerchIdle, { passive: true });
-document.addEventListener('pointerdown', (e) => {
-  if (!perch.contains(e.target) && !birdButton.contains(e.target)) closePerch();
-});
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
-    closePerch();
     closeAppearance();
     return;
   }
@@ -3807,19 +3520,12 @@ function restoreFlight(stored) {
   dayPhase = phase % 1;
   cloudSchedule = n('cloudSchedule', 0, 1) ?? 0;
   cloudOrigin = n('cloudOrigin') ?? -150;
-  const low = stored.low ?? {},
-    flock = stored.flock ?? {};
+  const low = stored.low ?? {};
   Object.assign(flight, {
     lowNext: finite(low.next, 0) ?? t + 160,
     lowUntil: finite(low.until, 0) ?? 0,
     low: low.on === true,
     lowAmount: finite(low.amount, 0, 1) ?? 0,
-  });
-  Object.assign(moments, {
-    nextFlock: finite(flock.next, 0) ?? t + 75,
-    flockStarted: finite(flock.started, 0) ?? 0,
-    flockUntil: finite(flock.until, 0) ?? 0,
-    flockOn: flock.on === true,
   });
   skyBodies(dayPhase, _sunDir, _moonDir);
   updateSunward();
@@ -3842,12 +3548,6 @@ function flightMemory() {
     cloudSchedule,
     cloudOrigin,
     low: { next: flight.lowNext, until: flight.lowUntil, on: flight.low, amount: flight.lowAmount },
-    flock: {
-      next: moments.nextFlock,
-      started: moments.flockStarted,
-      until: moments.flockUntil,
-      on: moments.flockOn,
-    },
     released: sunward.released,
   };
 }
@@ -3919,7 +3619,6 @@ function advance(dt, sound = true) {
   cloudSea.position.set(state.x, DECK_Y - 55, state.z);
   placeTrees(state.x, state.z);
   updateClouds(state.x, state.z, state.t);
-  updateMoments(dt, sound);
   updateCamera(dt);
   placeGrass(camera.position.x, camera.position.z);
   updateAtmosphere(dt);
@@ -4045,10 +3744,6 @@ renderer.setAnimationLoop(frame);
 
 window.addEventListener('resize', () => {
   if (disposed) return;
-  if (perch.classList.contains('open')) {
-    placePerch();
-    markOverflow();
-  }
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(renderScale());
@@ -4168,7 +3863,6 @@ window.__fly = {
   trace,
   renderer,
   camera,
-  moments,
   heightAt,
   obstacleFloor,
   dispose,
@@ -4195,7 +3889,6 @@ window.__fly = {
     sky,
     bird,
     paraglider: bird,
-    companions,
     sun,
     groundShade: { map: aoMap, origin: aoOrigin.value, span: AO_SPAN },
   },
@@ -4276,8 +3969,8 @@ window.__fly = {
     species: SPECIES,
     ruins: RUINS,
     props: PROPS,
-    birds: BIRDS,
-    plumages: PLUMAGES,
+    birds: registry.birds,
+    plumages: registry.plumages,
     markings: registry.markings,
     validate: () => validateLibrary(registry),
     validateBaked,
@@ -4285,21 +3978,10 @@ window.__fly = {
   sky: { sun: _sunDir, moon: _moonDir, events: SKY_EVENTS, galaxy },
   begin: () => beginBtn.click(),
   renderStyle: 'soft',
-  birds: BIRDS.map((entry) => entry.id),
   get appearance() {
     return paragliderAppearance;
   },
   defaultAppearance: DEFAULT_PARAGLIDER,
   appearanceColors: PARAGLIDER_COLOR_KEYS,
   setParagliderColor,
-  get bird() {
-    return birdKindId;
-  },
-  setBird: setBirdKind,
-  plumages: PLUMAGES.map((p) => p.id),
-  variants: catalog.variants.map((v) => v.id),
-  get plumage() {
-    return plumageId;
-  },
-  setPlumage: (plumage) => setBirdKind(birdKindId, plumage),
 };

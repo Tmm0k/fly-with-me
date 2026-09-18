@@ -69,9 +69,9 @@ export const biomes = [wildsong, elderwood, steppe, badlands, dunes, frostpines,
 export const species = [oak, elder, pine, acacia, birch, palm, blossomTree, deadwood, cypress];
 export const ruins = [ring, colonnade, gate, terrace, monolith];
 export const props = [boulders, cairns];
-// The first bird is the one a new visitor flies, in its own colors; the perch lists this order.
+// Bird entries remain ordered contributor content for future ambient wildlife.
 export const birds = [gull, eagle, swallow, crane, owl];
-// Plumages recolor any kind; the perch lists them after the kind's own colors, in this order.
+// Plumages recolor any kind and keep a stable catalog order.
 export const plumages = [dove, chestnut, ember, jay, kingfisher, raven, snow, dawn, moss, oriole, plum, ash, sand, sky, coal, slate];
 // The first marking paints nothing: it is what a kind in its own colors wears.
 // The rest are spread over the catalog by rule, so every kind shows each one.

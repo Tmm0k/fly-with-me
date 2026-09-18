@@ -164,7 +164,7 @@ export function colorProblem(value) {
  *   Three hinged segments per side, each `{ len, lead, leadTip, trail, trailTip, tip?, round?, bands?, primaries?, fingers?, color? }`.
  * @property {{ amp: number, glideAmp: number, rate: number, glideRate: number, rest: number[], seg: number[], lag: number[], ease?: number, warp?: number, sweep?: number, bob?: number }} flight
  *   The wingbeat: amplitude and rate flapping and gliding, the rest pose, per-segment weight and lag of the traveling wave.
- * @property {{ scale: number, spread?: number, wobble?: number }} flock How companions of this kind are sized and spaced.
+ * @property {{ scale: number, spread?: number, wobble?: number }} flock Legacy group-staging values retained with bird content.
  */
 
 export const defineBiome = (biome) => ({ kind: 'biome', ...biome });
@@ -286,7 +286,7 @@ export function validateLibrary({ biomes, species, ruins, props, birds = [], plu
   }
   for (const plumage of plumages) {
     const where = `plumage ${plumage.id}`;
-    if (typeof plumage.name !== 'string' || !plumage.name) errors.push(`${where}: needs a name for the perch`);
+    if (typeof plumage.name !== 'string' || !plumage.name) errors.push(`${where}: needs a display name`);
     for (const key of ['body', 'wing', 'tip', 'beak', 'accent']) color(`${where}.${key}`, plumage[key]);
   }
   if (plumages.length && !markings.length) errors.push('markings: plumages need at least one marking, the plain one first');

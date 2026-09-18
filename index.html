@@ -330,154 +330,6 @@
       #hud[inert] {
         visibility: hidden;
       }
-      /* The perch: the bird chooser, two strips above the controls line - the
-         kinds' shapes over the chosen kind's colors. */
-      #perch {
-        position: fixed;
-        left: max(1rem, env(safe-area-inset-left));
-        bottom: calc(max(0.7rem, env(safe-area-inset-bottom)) + 3.55rem);
-        max-width: min(760px, calc(100% - max(1rem, env(safe-area-inset-left)) - max(1rem, env(safe-area-inset-right))));
-        box-sizing: border-box;
-        padding: 0.5rem 0.6rem 0.45rem;
-        border-radius: 22px;
-        border: 1px solid rgba(241, 236, 227, 0.42);
-        background: rgba(14, 26, 34, 0.34);
-        backdrop-filter: blur(14px) saturate(1.15);
-        -webkit-backdrop-filter: blur(14px) saturate(1.15);
-        box-shadow:
-          inset 0 1px 0 rgba(248, 242, 230, 0.14),
-          0 10px 28px rgba(8, 18, 26, 0.18);
-        color: #f6f2ea;
-        z-index: 3;
-        opacity: 0;
-        transform: translateY(8px);
-        visibility: hidden;
-        transition:
-          opacity 0.4s ease,
-          transform 0.4s ease,
-          visibility 0s linear 0.4s;
-      }
-      #perch.open {
-        opacity: 1;
-        transform: none;
-        visibility: visible;
-        transition:
-          opacity 0.4s ease,
-          transform 0.4s ease;
-      }
-      .perchRow + .perchRow {
-        margin-top: 0.4rem;
-        padding-top: 0.35rem;
-        border-top: 1px solid rgba(241, 236, 227, 0.18);
-      }
-      .perchLabel {
-        display: block;
-        margin: 0 0 0.1rem 0.35rem;
-        font-size: 0.56rem;
-        letter-spacing: 0.24em;
-        text-transform: lowercase;
-        color: rgba(246, 242, 234, 0.6);
-        pointer-events: none;
-        white-space: nowrap;
-      }
-      /* An overflowing strip fades at the end it can still be scrolled toward,
-         so what is out of sight reads as more birds rather than an edge. */
-      .perchStrip {
-        --fadeStart: #000;
-        --fadeEnd: #000;
-        display: flex;
-        gap: 0.3rem;
-        align-items: flex-end;
-        overflow-x: auto;
-        overscroll-behavior-x: contain;
-        scroll-snap-type: x proximity;
-        scrollbar-width: none;
-        padding: 0.1rem 0.2rem 0.15rem;
-        mask-image: linear-gradient(to right, var(--fadeStart), #000 26px, #000 calc(100% - 26px), var(--fadeEnd));
-        -webkit-mask-image: linear-gradient(to right, var(--fadeStart), #000 26px, #000 calc(100% - 26px), var(--fadeEnd));
-      }
-      .perchStrip[data-overflow~='start'] {
-        --fadeStart: transparent;
-      }
-      .perchStrip[data-overflow~='end'] {
-        --fadeEnd: transparent;
-      }
-      .perchStrip::-webkit-scrollbar {
-        display: none;
-      }
-      /* The rail: a strip's own slim bar, shown only while it overflows. A
-         platform scrollbar would not do - macOS hides its overlay until a
-         scroll is already under way, which is the thing that needs telling. */
-      .perchRail {
-        height: 3px;
-        margin: 0.1rem 0.35rem 0;
-        border-radius: 2px;
-        background: rgba(241, 236, 227, 0.16);
-        opacity: 0;
-        transition: opacity 0.25s ease;
-      }
-      .perchRail.on {
-        opacity: 1;
-      }
-      .perchRail div {
-        height: 100%;
-        border-radius: 2px;
-        background: rgba(248, 242, 230, 0.62);
-      }
-      #perch .tile {
-        flex: none;
-        display: block;
-        padding: 0.25rem 0.1rem 0.1rem;
-        border: 1px solid transparent;
-        border-radius: 10px;
-        background: none;
-        color: inherit;
-        font: inherit;
-        cursor: pointer;
-        scroll-snap-align: center;
-        transition:
-          background 0.25s,
-          border-color 0.25s;
-      }
-      #perch .tile:hover {
-        background: rgba(241, 236, 227, 0.1);
-      }
-      #perch .tile[aria-pressed='true'] {
-        border-color: rgba(248, 242, 230, 0.85);
-        background: rgba(241, 236, 227, 0.14);
-      }
-      #perch .tile svg {
-        display: block;
-        width: 100%;
-        filter: drop-shadow(0 1px 2px rgba(8, 18, 26, 0.5));
-      }
-      #perchKinds .tile {
-        width: 104px;
-        padding-bottom: 0.2rem;
-      }
-      #perchKinds .tile svg {
-        height: 54px;
-      }
-      #perchKinds .tile .name {
-        display: block;
-        margin-top: 0.12rem;
-        font-size: 0.66rem;
-        letter-spacing: 0.08em;
-        text-align: center;
-        color: rgba(246, 242, 234, 0.82);
-      }
-      #perchKinds .tile[aria-pressed='true'] .name {
-        color: #f6f2ea;
-      }
-      #perchPlumages .tile {
-        width: 66px;
-      }
-      #perchPlumages .tile svg {
-        height: 38px;
-      }
-      #perchPlumages .tile.own {
-        margin-right: 0.35rem;
-      }
       #appearance {
         position: fixed;
         inset: 0;
@@ -732,18 +584,6 @@
       <a id="retryLink" hidden>try WebGL2</a>
       <noscript>JavaScript is needed to create this world.</noscript>
     </div>
-    <div id="perch" inert role="group" aria-label="Choose companion birds">
-      <div class="perchRow">
-        <span class="perchLabel" id="perchKindsLabel">shape</span>
-        <div class="perchStrip" id="perchKinds" role="group" aria-labelledby="perchKindsLabel"></div>
-        <div class="perchRail" aria-hidden="true"><div></div></div>
-      </div>
-      <div class="perchRow">
-        <span class="perchLabel" id="perchPlumagesLabel">colors</span>
-        <div class="perchStrip" id="perchPlumages" role="group" aria-labelledby="perchPlumagesLabel"></div>
-        <div class="perchRail" aria-hidden="true"><div></div></div>
-      </div>
-    </div>
     <div id="appearance" inert aria-hidden="true">
       <section class="appearanceModal" role="dialog" aria-modal="true" aria-labelledby="appearanceTitle">
         <header class="appearanceHeader">
@@ -827,7 +667,6 @@
       <button id="pauseBtn" aria-label="Pause flight" title="Pause flight" aria-pressed="false" disabled>
         pause
       </button>
-      <button id="birdBtn" aria-label="Change companion birds" title="Choose the companion flock" aria-expanded="false" aria-controls="perch">flock: gull</button>
       <button id="appearanceBtn" aria-label="Customize paraglider appearance" title="Customize paraglider appearance" aria-expanded="false" aria-controls="appearance">appearance</button>
       <span id="backendLabel" class="dim"></span>
     </div>

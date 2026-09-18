@@ -61,8 +61,13 @@ async function flightChecks() {
   );
   assert(!z.title.started && z.title.name === 0 && z.title.presents === 0, 'no title card before Begin');
   assert(
-    doc.getElementById('hud').inert && z.bird === z.library.birds[0].id && z.objects.bird.userData.kindId === z.bird,
-    "before Begin the companion flock is the registry's first and its control is out of reach",
+    doc.getElementById('hud').inert && z.objects.bird === z.objects.paraglider && z.objects.bird.name === 'paraglider',
+    'before Begin the sole player subject is the paraglider',
+  );
+  assert(
+    !doc.getElementById('birdBtn') && !doc.getElementById('perch') &&
+      !('companions' in z.objects) && !('moments' in z) && !('setBird' in z) && !('setPlumage' in z),
+    'companion meshes, scheduling APIs and flock controls are absent',
   );
   assert(!z.resumed && z.volume === 0.5, 'a fresh visit starts at half volume');
   assert(
@@ -159,14 +164,6 @@ async function flightChecks() {
     'pause stops simulation, rendering and audio',
   );
 
-  z.moments.flockOn = false;
-  z.moments.nextFlock = z.state.t;
-  for (let i = 0; i < 6; i++) z.step(0.05);
-  const arriving = z.objects.companions.find((b) => b.visible);
-  assert(
-    arriving && arriving.position.distanceTo(z.objects.bird.position) > 100,
-    'flock arrives from a distance instead of popping into formation',
-  );
   {
     // A title card that has begun finishes even though the steer ended the
     // opening: it comes fully up, holds, and is gone, on the simulation clock.
@@ -241,10 +238,6 @@ async function flightChecks() {
       'the library refuses a neon plumage and a first marking that paints, naming them',
     );
     assert(library.validate().length === 0, 'the library is whole again after the plumage trial');
-    const birdBody = z.objects.companions[0].children.find((o) => o.isMesh).geometry;
-    const tightBird = library.validateBaked({ kind: 'bird', id: 'trial', budget: { triangles: 1 } }, birdBody);
-    assert(tightBird.length === 1 && tightBird[0].startsWith('bird trial:'), 'a baked bird over its triangle budget is refused by name');
-    assert(library.validateBaked(firstBird, birdBody).length === 0, 'the bird fits its budget');
     assert(
       Object.keys(z.objects.props).length === library.props.length && library.props.every((p) => z.objects.props[p.id]),
       'every prop kind in the registry has a pool in the world',
@@ -485,7 +478,7 @@ async function flightChecks() {
   // 520 m along the bird's own bending look-ahead, which is what the flight
   // steers by; the ground straight below varies with terrain.
   const floorAhead = () => z.terrainAhead(520);
-  // Six simulated minutes exercise streamed windows, both cloud schedules and flocks.
+  // Six simulated minutes exercise streamed windows and both cloud schedules.
   // Same executable update path as RAF, without scheduling accelerated audio. The
   // day starts in the night before the moonset, so the flight passes the moonset and
   // sunrise pulls while it climbs, and the low pass below is asked for in the day's
@@ -1254,12 +1247,10 @@ async function flightChecks() {
   button('muteBtn');
   assert(doc.getElementById('muteBtn').textContent === 'sound off' && z.muted, 'sound can be turned off again');
 
-  // The paraglider remains the visible player while the corner perch dresses
-  // the companion flock. Its canopy, pilot, harness, lines, risers and arms are
-  // separate animation groups, and its cosmetic colors are independent.
+  // The paraglider is the sole player-following subject. Its canopy, pilot,
+  // harness, lines, risers and arms remain separate animation groups, and its
+  // cosmetic colors are independent.
   {
-    const birds = z.library.birds,
-      birdButton = doc.getElementById('birdBtn');
     const rig = z.objects.paraglider,
       colors = rig.userData.appearance.colors,
       animationState = rig.userData.animation;
@@ -1395,10 +1386,8 @@ async function flightChecks() {
       'released steering settles smoothly back toward neutral',
     );
     assert(lineError() < 0.001, 'dynamic lines remain attached after the rig settles');
-    assert(!doc.getElementById('hud').inert && birdButton.textContent.includes(birds[0].name), 'after Begin the flock control is in reach and names the first kind');
-    const before = z.objects.bird.position.clone();
-    const perch = doc.getElementById('perch'),
-      appearancePanel = doc.getElementById('appearance'),
+    assert(!doc.getElementById('hud').inert && !doc.getElementById('birdBtn'), 'after Begin the HUD remains available without a flock control');
+    const appearancePanel = doc.getElementById('appearance'),
       appearanceButton = doc.getElementById('appearanceBtn'),
       appearanceClose = doc.getElementById('appearanceClose'),
       appearanceInputs = [...appearancePanel.querySelectorAll('[data-paraglider-color]')];
@@ -1431,8 +1420,6 @@ async function flightChecks() {
     chooseColor('skin', '#f2cf3a');
     appearancePanel.querySelector('[data-skin-preset="4a91d1"]').click();
     parts = rig.userData.parts;
-    const playerChildren = [...rig.children],
-      chosenAppearance = { ...z.appearance.colors };
     assert(
       z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.pants === 0x8b5a32 &&
         z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.skin === 0x4a91d1 &&
@@ -1463,89 +1450,16 @@ async function flightChecks() {
     );
     for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
     assert(parts.canopy.rotation.z > 0.04 && lineError() < 0.001, 'maneuver animation and moving lines continue after an appearance change');
-    assert(perch.inert && !perch.classList.contains('open'), 'the perch is closed and out of reach until the control opens it');
-    before.copy(z.objects.bird.position);
-    birdButton.click();
     assert(
-      perch.classList.contains('open') && !perch.inert && !appearancePanel.classList.contains('open') && appearancePanel.inert,
-      'the corner control opens the perch and closes the appearance panel',
+      !('companions' in z.objects) && !('moments' in z) && !doc.getElementById('perch'),
+      'simulation steps and appearance rebuilding do not create or retain companion state',
     );
-    appearanceButton.click();
-    assert(appearancePanel.classList.contains('open') && perch.inert && !perch.classList.contains('open'), 'opening appearance while the flock panel is open keeps the panels mutually exclusive');
-    appearanceClose.click();
-    birdButton.click();
-    const kindTiles = [...perch.querySelectorAll('#perchKinds .tile[data-kind]')],
-      colorTiles = () => [...perch.querySelectorAll('#perchPlumages .tile[data-variant]')];
-    assert(
-      kindTiles.length === birds.length && birds.every((b) => kindTiles.some((t) => t.dataset.kind === b.id)),
-      'the upper strip holds every kind, one shape each',
-    );
-    const colorsOf = (kind) => [kind, ...z.plumages.map((p) => kind + '-' + p)];
-    assert(
-      colorTiles()
-        .map((t) => t.dataset.variant)
-        .join() === colorsOf(birds[0].id).join(),
-      "the lower strip holds the flock kind's own colors first, then its plumages, and no other kind's",
-    );
-    kindTiles.find((t) => t.dataset.kind === birds[1].id).click();
-    assert(
-      z.bird === birds[1].id && z.plumage === null && z.objects.bird.userData.kindId === birds[1].id && birdButton.textContent.includes(birds[1].name),
-      'a shape tile selects that companion kind in its own colors and the control names it',
-    );
-    assert(
-      colorTiles()
-        .map((t) => t.dataset.variant)
-        .join() === colorsOf(birds[1].id).join(),
-      'picking a kind refreshes the colors to that kind',
-    );
-    assert(z.objects.companions.every((b) => b.userData.kindId === birds[1].id), 'every companion uses the chosen flock kind');
-    assert(
-      z.objects.bird.position.distanceTo(before) < 0.000001 &&
-        playerChildren.every((child, i) => z.objects.bird.children[i] === child) &&
-        z.objects.bird.userData.animation === animationState &&
-        z.appearanceColors.every((key) => z.appearance.colors[key] === chosenAppearance[key]),
-      'changing the flock leaves paraglider appearance, animation and hierarchy intact and where it was',
-    );
-    const pivot = z.objects.companions[0].userData.wings[0].pivots[0],
-      hinge = pivot.rotation.z;
-    z.moments.flockStarted = z.state.t - 5;
-    z.moments.flockUntil = z.state.t + 10;
-    z.moments.flockOn = true;
-    z.state.flapBurst = 5;
-    z.step(0.05);
-    assert(pivot.rotation.z !== hinge, 'the selected companion kind beats its wings');
-    // The colors overflow their strip, and an ordinary vertical wheel - no
-    // shift - scrolls it sideways, with the reachable edge faded.
-    const colorStrip = doc.getElementById('perchPlumages');
-    assert(colorStrip.scrollWidth > colorStrip.clientWidth + 1 && colorStrip.dataset.overflow.includes('end'), 'the colors overflow their strip and its far edge fades');
-    const scrolledFrom = colorStrip.scrollLeft;
-    colorStrip.dispatchEvent(new win.WheelEvent('wheel', { deltaY: 120, deltaX: 0, bubbles: true, cancelable: true }));
-    assert(colorStrip.scrollLeft > scrolledFrom, 'a plain vertical wheel scrolls the colors sideways');
-    const plumageTile = colorTiles().find((t) => t.dataset.variant === birds[1].id + '-' + z.plumages[3]);
-    plumageTile.click();
-    assert(
-      z.plumage === z.plumages[3] && z.objects.bird.userData.variant.id === plumageTile.dataset.variant && z.objects.bird.userData.kindId === birds[1].id,
-      'a plumage tile recolors the same kind',
-    );
-    assert(
-      z.objects.companions.every((b) => b.userData.kindId === birds[1].id && b.userData.variant.plumage),
-      'the flock wears the chosen kind and a plumage of its family',
-    );
-    kindTiles.find((t) => t.dataset.kind === birds[2].id).click();
-    assert(z.bird === birds[2].id && z.plumage === z.plumages[3] && z.objects.bird.userData.variant.id === birds[2].id + '-' + z.plumages[3], 'picking a shape keeps the plumage');
-    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' }));
-    assert(!perch.classList.contains('open') && perch.inert, 'Escape closes the perch');
-    z.setBird(birds[0].id);
-    z.setPlumage(null);
-    assert(z.bird === birds[0].id && z.plumage === null && z.objects.bird.userData.variant.id === birds[0].id, 'the first kind in its own colors again');
     z.state.y = z.heightAt(z.state.x, z.state.z) - 20;
     z.step(1 / 60);
     assert(
       z.state.y - z.obstacleFloor(z.state.x, z.state.z) >= 8 + rig.userData.appearance.below - 0.000001,
       'the flight floor accounts for the pilot hanging below the paraglider pivot',
     );
-    z.setBird(birds[1].id);
-    z.setPlumage(z.plumages[2]);
   }
   const performance = { ...z.renderer.info.render, ...z.perf };
   const left = {
@@ -1557,8 +1471,6 @@ async function flightChecks() {
     t: z.state.t,
     dayPhase: z.dayPhase,
     cam: { yaw: z.cam.yaw, pitch: z.cam.pitch, dist: z.cam.dist },
-    bird: z.bird,
-    plumage: z.plumage,
     appearance: { ...z.appearance.colors },
   };
   const disposal = z.dispose();
@@ -1570,6 +1482,14 @@ async function flightChecks() {
 
   // What the page remembers. Reopened without a seed in the address, the remembered
   // world continues at the exact place, course and time of day, with the settings.
+  // Obsolete flock fields from an older build remain harmlessly ignored.
+  const legacySettings = JSON.parse(localStorage.getItem('fly-with-me-settings'));
+  legacySettings.bird = 'owl';
+  legacySettings.plumage = 'raven';
+  localStorage.setItem('fly-with-me-settings', JSON.stringify(legacySettings));
+  const legacyResume = JSON.parse(localStorage.getItem('fly-with-me-resume'));
+  legacyResume.flock = { next: 0, started: 1, until: 99999, on: true };
+  localStorage.setItem('fly-with-me-resume', JSON.stringify(legacyResume));
   const noSeed = new URL(location.href);
   noSeed.searchParams.delete('seed');
   const again = await openWorld(noSeed.href);
@@ -1599,13 +1519,9 @@ async function flightChecks() {
     "the viewer's framing is remembered",
   );
   assert(
-    again.z.bird === left.bird &&
-      left.bird === again.z.library.birds[1].id &&
-      again.z.objects.bird.userData.kindId === left.bird &&
-      again.z.plumage === left.plumage &&
-      again.z.objects.bird.userData.variant.id === left.bird + '-' + left.plumage &&
-      again.doc.getElementById('birdBtn').textContent.includes(again.z.library.birds[1].name),
-    'the bird and its plumage are remembered',
+    again.z.objects.bird === again.z.objects.paraglider && !('companions' in again.z.objects) &&
+      !('moments' in again.z) && !again.doc.getElementById('birdBtn') && !again.doc.getElementById('perch'),
+    'obsolete saved bird, plumage and flock fields do not restore companion runtime or UI',
   );
   assert(
     again.z.appearanceColors.every((key) => again.z.appearance.colors[key] === left.appearance[key]) &&
@@ -1639,9 +1555,9 @@ async function flightChecks() {
     'an explicit seed stays in the address as given',
   );
   assert(
-    fresh.z.volume === 0.4 && fresh.z.muted && fresh.z.bird === left.bird && fresh.z.plumage === left.plumage &&
+    fresh.z.volume === 0.4 && fresh.z.muted &&
       fresh.z.appearanceColors.every((key) => fresh.z.appearance.colors[key] === left.appearance[key]),
-    'settings carry over to another world, including flock and paraglider appearance',
+    'settings carry over to another world, including paraglider appearance',
   );
   assert(fresh.z.intro.beat === 'side', 'another world opens with the opening again');
   await closeWorld(fresh);
