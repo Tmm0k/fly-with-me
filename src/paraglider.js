@@ -47,7 +47,7 @@ export function normalizeParagliderAppearance(appearance) {
   return { ...DEFAULT_PARAGLIDER, colors };
 }
 
-function geometryFromQuads(THREE, quads) {
+function geometryFromFaces(THREE, quads, triangles = []) {
   const positions = [];
   const colors = [];
   const push = (point, color) => {
@@ -59,22 +59,8 @@ function geometryFromQuads(THREE, quads) {
     const order = flip ? [0, 2, 1, 0, 3, 2] : [0, 1, 2, 0, 2, 3];
     for (const i of order) push(points[i], color);
   }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-function geometryFromTriangles(THREE, triangles) {
-  const positions = [];
-  const colors = [];
   for (const { points, color } of triangles) {
-    const c = new THREE.Color(color);
-    for (const point of points) {
-      positions.push(...point);
-      colors.push(c.r, c.g, c.b);
-    }
+    for (const point of points) push(point, color);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
@@ -91,7 +77,7 @@ function canopyPaint(colors, v) {
 
 function buildCanopyGeometry(THREE, colors) {
   const cellCount = 28;
-  const spanSteps = cellCount * 2;
+  const spanSteps = cellCount * 4;
   const chordSteps = 12;
   const halfSpan = 5.1;
   const point = (u, v, upper) => {
@@ -134,14 +120,11 @@ function buildCanopyGeometry(THREE, colors) {
         flip: true,
       });
     }
-    for (const v of [0, 1]) {
-      const color = v === 0 ? colors.canopySecondary : colors.canopyPrimary;
-      quads.push({
-        points: [point(u0, v, false), point(u1, v, false), point(u1, v, true), point(u0, v, true)],
-        color,
-        flip: v === 1,
-      });
-    }
+    quads.push({
+      points: [point(u0, 1, false), point(u1, 1, false), point(u1, 1, true), point(u0, 1, true)],
+      color: colors.canopyPrimary,
+      flip: true,
+    });
   }
   for (const u of [-1, 1]) {
     for (let j = 0; j < chordSteps; j++) {
@@ -154,37 +137,74 @@ function buildCanopyGeometry(THREE, colors) {
       });
     }
   }
-  const openings = [];
-  const openingSegments = 10;
-  for (let cell = 0; cell < cellCount; cell++) {
-    const u = -1 + ((cell + 0.5) * 2) / cellCount;
+  const openingQuads = [];
+  const openingBacks = [];
+  const openingSegments = 12;
+  const intakeDepth = 0.14;
+  const leading = (u) => {
     const upper = point(u, 0, true);
     const lower = point(u, 0, false);
-    const center = [upper[0], (upper[1] + lower[1]) * 0.5, (upper[2] + lower[2]) * 0.5 + 0.012];
-    const perimeter = [];
+    return {
+      x: (upper[0] + lower[0]) * 0.5,
+      y: (upper[1] + lower[1]) * 0.5,
+      z: (upper[2] + lower[2]) * 0.5,
+      halfHeight: (upper[1] - lower[1]) * 0.5,
+    };
+  };
+  // Each cell replaces the closed nose face with a fabric rim around a short tunnel.
+  for (let cell = 0; cell < cellCount; cell++) {
+    const u = -1 + ((cell + 0.5) * 2) / cellCount;
+    const center = leading(u);
+    const outer = [];
+    const mouth = [];
+    const back = [];
     for (let segment = 0; segment < openingSegments; segment++) {
       const angle = (segment / openingSegments) * Math.PI * 2;
-      const edgeU = u + (Math.cos(angle) * 0.62) / cellCount;
-      const edgeUpper = point(edgeU, 0, true);
-      const edgeLower = point(edgeU, 0, false);
-      perimeter.push([
-        (edgeUpper[0] + edgeLower[0]) * 0.5,
-        (edgeUpper[1] + edgeLower[1]) * 0.5 + Math.sin(angle) * (upper[1] - lower[1]) * 0.29,
-        (edgeUpper[2] + edgeLower[2]) * 0.5 + 0.014,
+      const cosine = Math.cos(angle);
+      const sine = Math.sin(angle);
+      const edgeScale = 1 / Math.max(Math.abs(cosine), Math.abs(sine));
+      const outerEdge = leading(u + (cosine * edgeScale) / cellCount);
+      const mouthEdge = leading(u + (cosine * 0.62) / cellCount);
+      const backEdge = leading(u + (cosine * 0.52) / cellCount);
+      outer.push([
+        outerEdge.x,
+        outerEdge.y + sine * edgeScale * outerEdge.halfHeight,
+        outerEdge.z,
+      ]);
+      mouth.push([
+        mouthEdge.x,
+        mouthEdge.y + sine * center.halfHeight * 0.58,
+        mouthEdge.z + 0.006,
+      ]);
+      back.push([
+        backEdge.x,
+        backEdge.y + sine * center.halfHeight * 0.48,
+        backEdge.z - intakeDepth,
       ]);
     }
     for (let segment = 0; segment < openingSegments; segment++) {
-      openings.push({
-        points: [center, perimeter[segment], perimeter[(segment + 1) % openingSegments]],
+      const next = (segment + 1) % openingSegments;
+      quads.push({
+        points: [outer[segment], outer[next], mouth[next], mouth[segment]],
+        color: colors.canopySecondary,
+      });
+      openingQuads.push({
+        points: [mouth[segment], mouth[next], back[next], back[segment]],
+        color: colors.canopyPattern,
+      });
+      openingBacks.push({
+        points: [[center.x, center.y, center.z - intakeDepth], back[segment], back[next]],
         color: colors.canopyPattern,
       });
     }
   }
   return {
-    geometry: geometryFromQuads(THREE, quads),
-    openings: geometryFromTriangles(THREE, openings),
+    geometry: geometryFromFaces(THREE, quads),
+    openings: geometryFromFaces(THREE, openingQuads, openingBacks),
     point,
     cellCount,
+    intakeDepth,
+    openingSegments,
   };
 }
 
@@ -326,6 +346,8 @@ export function createParaglider(appearance, kit) {
   canopySurface.userData.cellCount = canopyBuilt.cellCount;
   const cellOpenings = mesh(THREE, canopyBuilt.openings, material, 'canopy-cell-openings');
   cellOpenings.userData.cellCount = canopyBuilt.cellCount;
+  cellOpenings.userData.intakeDepth = canopyBuilt.intakeDepth;
+  cellOpenings.userData.openingSegments = canopyBuilt.openingSegments;
   cellOpenings.castShadow = false;
   canopy.add(canopySurface, cellOpenings);
   rig.add(canopy);

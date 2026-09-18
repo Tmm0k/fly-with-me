@@ -1294,9 +1294,19 @@ async function flightChecks() {
     const canopySpan = canopySurface.geometry.boundingBox.max.x - canopySurface.geometry.boundingBox.min.x;
     assert(
       canopySurface.name === 'canopy-surface' && cellOpenings.name === 'canopy-cell-openings' &&
-        canopySurface.userData.cellCount >= 24 &&
-        cellOpenings.geometry.attributes.position.count === canopySurface.userData.cellCount * 10 * 3,
-      'the canopy surface carries repeated inflated cells and one rounded intake opening per cell',
+        canopySurface.userData.cellCount === 28 && cellOpenings.userData.cellCount === 28,
+      'the canopy retains 28 repeated inflated cells and one rounded intake mouth per cell',
+    );
+    assert(
+      cellOpenings.userData.intakeDepth >= 0.1 && cellOpenings.userData.openingSegments >= 10 &&
+        cellOpenings.geometry.attributes.position.count ===
+          cellOpenings.userData.cellCount * cellOpenings.userData.openingSegments * 9,
+      'every cell mouth has a short tunnel and recessed interior plate rather than a flat marking',
+    );
+    assert(
+      [canopySurface, cellOpenings].every((part) =>
+        [...part.geometry.attributes.position.array].every(Number.isFinite)),
+      'the refined canopy and recessed intakes contain only finite vertices',
     );
     assert(canopySpan >= 10 && canopySpan <= 10.3, 'the refined canopy remains inside the established gameplay span');
     assert(!parts.canopy.getObjectByName('canopy-m-pattern'), 'the obsolete M marking is absent from the refined canopy');
@@ -1406,7 +1416,7 @@ async function flightChecks() {
     assert(
       z.appearance.colors.canopyPrimary === 0x62d347 && z.appearance.colors.canopySecondary === 0xd8ebf2 &&
         z.appearance.colors.canopyPattern === 0x293140 && parts.canopySurface.geometry !== originalCanopyGeometry &&
-        parts.canopySurface.userData.cellCount === canopySurface.userData.cellCount &&
+        parts.canopySurface.userData.cellCount === canopySurface.userData.cellCount && parts.cellOpenings.userData.intakeDepth >= 0.1 &&
         !parts.canopy.getObjectByName('canopy-m-pattern'),
       'primary, secondary and pattern controls rebuild the same refined cells and transition band without restoring the M graphic',
     );
