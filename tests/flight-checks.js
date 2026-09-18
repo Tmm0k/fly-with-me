@@ -1266,7 +1266,7 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
       'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses, gloves and shoes',
     );
     assert(
@@ -1281,7 +1281,9 @@ async function flightChecks() {
     assert(
       parts.shoes.children.map((child) => child.name).join() === 'shoe-uppers,shoe-soles' &&
         parts.shoes.children.every((child) => child.geometry.attributes.position.count > 0) &&
-        parts.shoes.parent === parts.pilot && parts.pilot.getObjectByName('seated-legs') !== parts.shoes,
+        parts.shoes.parent === parts.pilot && parts.pants.parent === parts.pilot &&
+        parts.pants.children.map((child) => child.name).join() === 'pants-seat,seated-legs' &&
+        parts.pants.getObjectByName('seated-legs') !== parts.shoes && parts.harness.parent === parts.pilot,
       'modeled shoe uppers and soles are a distinct pilot feature',
     );
     const pilotMeshes = [];
@@ -1424,6 +1426,7 @@ async function flightChecks() {
     chooseColor('canopySecondary', '#d8ebf2');
     chooseColor('canopyPattern', '#293140');
     chooseColor('jacket', '#315a7d');
+    chooseColor('pants', '#8b5a32');
     chooseColor('shoes', '#e7d36f');
     chooseColor('skin', '#f2cf3a');
     appearancePanel.querySelector('[data-skin-preset="4a91d1"]').click();
@@ -1431,8 +1434,9 @@ async function flightChecks() {
     const playerChildren = [...rig.children],
       chosenAppearance = { ...z.appearance.colors };
     assert(
-      z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.skin === 0x4a91d1 &&
-        rig.userData.appearance.colors.jacket === 0x315a7d && rig.userData.animation === animationState,
+      z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.pants === 0x8b5a32 &&
+        z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.skin === 0x4a91d1 &&
+        rig.userData.appearance.colors.pants === 0x8b5a32 && rig.userData.animation === animationState,
       'appearance controls recolor the visible rig without replacing its pivot or maneuver state',
     );
     const skinColors = parts.skin.geometry.attributes.color.array,
@@ -1451,7 +1455,12 @@ async function flightChecks() {
         !parts.canopy.getObjectByName('canopy-m-pattern'),
       'primary, secondary and pattern controls rebuild the same refined cells and transition band without restoring the M graphic',
     );
-    assert(parts.shoes !== undefined && parts.shoes.children.length === 2, 'appearance rebuilding retains the modeled shoes');
+    assert(
+      parts.pants?.children.length === 2 && parts.harness?.getObjectByName('harness-shell') && parts.shoes?.children.length === 2 &&
+        [parts.pantsSeat, parts.seatedLegs, ...parts.shoes.children].every((part) =>
+          [...part.geometry.attributes.position.array].every(Number.isFinite)),
+      'appearance rebuilding retains finite pants, harness and modeled shoe geometry',
+    );
     for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
     assert(parts.canopy.rotation.z > 0.04 && lineError() < 0.001, 'maneuver animation and moving lines continue after an appearance change');
     assert(perch.inert && !perch.classList.contains('open'), 'the perch is closed and out of reach until the control opens it');

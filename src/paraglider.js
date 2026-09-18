@@ -264,6 +264,42 @@ function profiledGeometry(THREE, rings, segments = 12) {
   return geometry;
 }
 
+// A few low, chamfered cross-sections make a readable sneaker without the
+// inflated silhouette produced by capsules and overlapping spheres.
+function shoeGeometry(THREE, sections) {
+  const positions = [];
+  const indices = [];
+  for (const { z, width, bottom, top, bevel } of sections) {
+    const inset = Math.min(bevel, width * 0.45, (top - bottom) * 0.45);
+    positions.push(
+      -width + inset, bottom, z,
+      width - inset, bottom, z,
+      width, bottom + inset, z,
+      width, top - inset, z,
+      width - inset, top, z,
+      -width + inset, top, z,
+      -width, top - inset, z,
+      -width, bottom + inset, z,
+    );
+  }
+  for (let section = 0; section < sections.length - 1; section++) {
+    const at = section * 8;
+    const nextAt = at + 8;
+    for (let i = 0; i < 8; i++) {
+      const next = (i + 1) % 8;
+      indices.push(at + i, at + next, nextAt + next, at + i, nextAt + next, nextAt + i);
+    }
+  }
+  for (let i = 1; i < 7; i++) indices.push(0, i + 1, i);
+  const end = (sections.length - 1) * 8;
+  for (let i = 1; i < 7; i++) indices.push(end, end + i, end + i + 1);
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  return geometry;
+}
+
 function mesh(THREE, geometry, material, name) {
   const result = new THREE.Mesh(geometry, material);
   result.name = name;
@@ -462,7 +498,8 @@ export function createParaglider(appearance, kit) {
   for (const side of [-1, 1]) {
     harnessStraps.push(
       { ...strut(THREE, [side * 0.27, 0.67, -0.38], [side * 0.2, 0.08, -0.44], 0.035, 7), color: colors.harness },
-      { ...strut(THREE, [side * 0.21, 0.02, -0.31], [side * 0.23, -0.3, 0.01], 0.032, 7), color: colors.harness },
+      { ...strut(THREE, [side * 0.21, 0.02, -0.31], [side * 0.27, -0.31, -0.12], 0.032, 7), color: colors.harness },
+      { ...strut(THREE, [side * 0.27, -0.31, -0.12], [side * 0.24, -0.49, 0.34], 0.026, 7), color: colors.harness },
     );
   }
   harnessStraps.push({ ...strut(THREE, [-0.33, 0.08, -0.43], [0.33, 0.08, -0.43], 0.035, 7), color: colors.harness });
@@ -471,7 +508,14 @@ export function createParaglider(appearance, kit) {
       THREE,
       merge([
         { geometry: harnessBack, color: colors.harness },
-        { geometry: new THREE.SphereGeometry(1, 12, 8), matrix: M(0, -0.29, 0.04, 0.46, 0.2, 0.54, 0.2, 0, 0), color: colors.harness },
+        {
+          geometry: profiledGeometry(THREE, [
+            { y: -0.16, z: -0.25, rx: 0.28, rz: 0.1 },
+            { y: -0.27, z: -0.18, rx: 0.37, rz: 0.15 },
+            { y: -0.37, z: -0.02, rx: 0.32, rz: 0.18 },
+          ], 12),
+          color: colors.harness,
+        },
         ...harnessStraps,
       ]),
       material,
@@ -559,31 +603,61 @@ export function createParaglider(appearance, kit) {
   const right = limb(THREE, material, merge, colors.jacket, colors.gloves, 1);
   pilot.add(left.arm, right.arm);
 
+  const pants = new THREE.Group();
+  pants.name = 'pants';
+  const pantsSeat = mesh(
+    THREE,
+    merge([{
+      geometry: profiledGeometry(THREE, [
+        { y: 0.015, z: -0.035, rx: 0.22, rz: 0.14 },
+        { y: -0.1, z: -0.015, rx: 0.285, rz: 0.19 },
+        { y: -0.24, z: 0.035, rx: 0.31, rz: 0.225 },
+        { y: -0.35, z: 0.14, rx: 0.27, rz: 0.2 },
+      ], 12),
+      color: colors.pants,
+    }]),
+    material,
+    'pants-seat',
+  );
   const legs = [];
   const shoeUppers = [];
   const shoeSoles = [];
   for (const side of [-1, 1]) {
-    const hip = [side * 0.2, -0.2, 0.015];
-    const knee = [side * 0.24, -0.56, 0.62];
-    const foot = [side * 0.24, -1.13, 0.5];
-    const thigh = strut(THREE, hip, knee, [0.18, 0.14], 10);
-    const shin = strut(THREE, knee, foot, [0.14, 0.09], 10);
+    const hip = [side * 0.19, -0.27, 0.13];
+    const knee = [side * 0.24, -0.58, 0.62];
+    const foot = [side * 0.24, -1.12, 0.51];
+    const thigh = strut(THREE, hip, knee, [0.17, 0.145], 10);
+    const shin = strut(THREE, knee, foot, [0.145, 0.095], 10);
     legs.push({ ...thigh, color: colors.pants }, { ...shin, color: colors.pants });
     legs.push(
-      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(...hip, 0.185, 0.16, 0.18), color: colors.pants },
-      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(...knee, 0.15, 0.145, 0.155), color: colors.pants },
-      { geometry: new THREE.CylinderGeometry(0.1, 0.09, 0.12, 9), matrix: M(side * 0.24, -1.1, 0.5, 1, 1, 1, 0.2, 0, 0), color: colors.pants },
+      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(...knee, 0.15, 0.14, 0.15), color: colors.pants },
+      { geometry: new THREE.CylinderGeometry(0.105, 0.095, 0.15, 9), matrix: M(side * 0.24, -1.08, 0.5, 1, 1, 1, 0.2, 0, 0), color: colors.pants },
     );
     shoeUppers.push(
-      { geometry: new THREE.CapsuleGeometry(0.115, 0.25, 5, 10), matrix: M(side * 0.24, -1.19, 0.66, 1.12, 1, 0.9, Math.PI / 2, 0, 0), color: colors.shoes },
-      { geometry: new THREE.SphereGeometry(1, 12, 7), matrix: M(side * 0.24, -1.19, 0.87, 0.145, 0.105, 0.19), color: colors.shoes },
-      { geometry: new THREE.BoxGeometry(0.235, 0.17, 0.17), matrix: M(side * 0.24, -1.2, 0.43, 1, 1, 1, -0.06, 0, 0), color: colors.shoes },
-      { geometry: new THREE.BoxGeometry(0.18, 0.055, 0.22), matrix: M(side * 0.24, -1.08, 0.66, 1, 1, 1, -0.28, 0, 0), color: colors.shoes },
+      {
+        geometry: shoeGeometry(THREE, [
+          { z: -0.25, width: 0.105, bottom: -0.065, top: 0.105, bevel: 0.025 },
+          { z: -0.1, width: 0.115, bottom: -0.065, top: 0.12, bevel: 0.025 },
+          { z: 0.08, width: 0.135, bottom: -0.065, top: 0.095, bevel: 0.025 },
+          { z: 0.25, width: 0.12, bottom: -0.065, top: 0.055, bevel: 0.025 },
+        ]),
+        matrix: M(side * 0.24, -1.2, 0.69, 1, 1, 1, 0.035, 0, 0),
+        color: colors.shoes,
+      },
     );
-    shoeSoles.push({ geometry: new THREE.BoxGeometry(0.285, 0.055, 0.59), matrix: M(side * 0.24, -1.3, 0.66, 1, 1, 1, 0.035, 0, 0), color: colors.shoes });
+    shoeSoles.push({
+      geometry: shoeGeometry(THREE, [
+        { z: -0.29, width: 0.12, bottom: -0.03, top: 0.03, bevel: 0.015 },
+        { z: 0.1, width: 0.15, bottom: -0.03, top: 0.03, bevel: 0.015 },
+        { z: 0.29, width: 0.135, bottom: -0.03, top: 0.03, bevel: 0.015 },
+      ]),
+      matrix: M(side * 0.24, -1.285, 0.69, 1, 1, 1, 0.035, 0, 0),
+      color: colors.shoes,
+    });
   }
   const seatedLegs = mesh(THREE, merge(legs), material, 'seated-legs');
-  pilot.add(seatedLegs);
+  pants.add(pantsSeat, seatedLegs);
+  pilot.add(pants);
   const shoes = new THREE.Group();
   shoes.name = 'shoes';
   shoes.add(
@@ -663,6 +737,8 @@ export function createParaglider(appearance, kit) {
     headwear,
     sunglasses,
     jacket,
+    pants,
+    pantsSeat,
     seatedLegs,
     leftGlove: left.glove,
     rightGlove: right.glove,
