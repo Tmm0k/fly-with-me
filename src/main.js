@@ -4,7 +4,14 @@
 // the markup and the import map; the library (library/) holds every place.
 import * as THREE from 'three';
 import { buildBird, animateBird } from './birds.js';
-import { animateParaglider, createParaglider, DEFAULT_PARAGLIDER } from './paraglider.js';
+import {
+  animateParaglider,
+  createParaglider,
+  DEFAULT_PARAGLIDER,
+  dressParaglider,
+  normalizeParagliderAppearance,
+  PARAGLIDER_COLOR_KEYS,
+} from './paraglider.js';
 import { plumageCatalog, paintMarking, plumageTile } from './plumage.js';
 import {
   WebGPURenderer,
@@ -2346,6 +2353,8 @@ scene.add(cloudSea);
 // ---------------------------------------------------------------------------
 const birdMaterial = propMaterial({ basic: { side: THREE.DoubleSide } });
 const birdKit = { THREE, merge: mergeParts, M };
+const paragliderKit = { ...birdKit, material: birdMaterial };
+let paragliderAppearance = normalizeParagliderAppearance(storedSettings.paraglider);
 let birdKindId = BIRD[storedSettings.bird] ? storedSettings.bird : BIRDS[0].id;
 // The plumage is a second remembered field; null is the kind's own colors.
 let plumageId = catalog.has(storedSettings.plumage) ? storedSettings.plumage : null;
@@ -2406,7 +2415,7 @@ function makeBird(kindId, size = 1, plumage = plumageId) {
 const animateWings = animateBird;
 // Keep the long-standing `bird` name for the engine's player pivot and public
 // review API. Its visible children are exclusively the paraglider rig.
-const bird = createParaglider(DEFAULT_PARAGLIDER, { THREE, merge: mergeParts, M, material: birdMaterial });
+const bird = createParaglider(paragliderAppearance, paragliderKit);
 bird.userData.kind = BIRD[birdKindId];
 bird.userData.kindId = birdKindId;
 bird.userData.variant = catalog.variantOf(BIRD[birdKindId], plumageId);
@@ -3391,6 +3400,7 @@ function saveSettings() {
     camera: { yaw: cam.yaw, pitch: cam.pitch, dist: cam.dist },
     bird: birdKindId,
     plumage: plumageId,
+    paraglider: { colors: { ...paragliderAppearance.colors } },
   });
 }
 // ---------------------------------------------------------------------------
@@ -3405,6 +3415,9 @@ const birdButton = document.getElementById('birdBtn'),
   perch = document.getElementById('perch'),
   kindStrip = document.getElementById('perchKinds'),
   plumageStrip = document.getElementById('perchPlumages'),
+  appearanceButton = document.getElementById('appearanceBtn'),
+  appearancePanel = document.getElementById('appearance'),
+  appearanceInputs = [...document.querySelectorAll('[data-paraglider-color]')],
   hudLine = document.getElementById('hud');
 const kindTiles = new Map(),
   tiles = new Map();
@@ -3501,8 +3514,12 @@ function armPerchIdle() {
 function placePerch() {
   perch.style.bottom = `${Math.round(window.innerHeight - hudLine.getBoundingClientRect().top + 8)}px`;
 }
+function placeAppearance() {
+  appearancePanel.style.bottom = `${Math.round(window.innerHeight - hudLine.getBoundingClientRect().top + 8)}px`;
+}
 function openPerch() {
   if (perch.classList.contains('open')) return;
+  closeAppearance();
   buildPerch();
   placePerch();
   perch.inert = false;
@@ -3521,13 +3538,57 @@ function closePerch() {
   perch.inert = true;
   birdButton.setAttribute('aria-expanded', 'false');
 }
+const colorHex = (color) => `#${color.toString(16).padStart(6, '0')}`;
+function showAppearance() {
+  for (const input of appearanceInputs) input.value = colorHex(paragliderAppearance.colors[input.dataset.paragliderColor]);
+}
+function setParagliderColor(key, value) {
+  if (!PARAGLIDER_COLOR_KEYS.includes(key)) throw new Error('unknown paraglider color: ' + key);
+  if (!Number.isInteger(value) || value < 0 || value > 0xffffff) throw new Error('invalid paraglider color: ' + value);
+  paragliderAppearance = normalizeParagliderAppearance({
+    colors: { ...paragliderAppearance.colors, [key]: value },
+  });
+  dressParaglider(bird, paragliderAppearance, paragliderKit);
+  showAppearance();
+  saveSettings();
+  if (!running || paused) {
+    last = performance.now();
+    renderer.setAnimationLoop(frame);
+  }
+}
+function openAppearance() {
+  if (appearancePanel.classList.contains('open')) return;
+  closePerch();
+  placeAppearance();
+  showAppearance();
+  appearancePanel.inert = false;
+  appearancePanel.classList.add('open');
+  appearanceButton.setAttribute('aria-expanded', 'true');
+}
+function closeAppearance() {
+  if (!appearancePanel.classList.contains('open')) return;
+  appearancePanel.classList.remove('open');
+  appearancePanel.inert = true;
+  appearanceButton.setAttribute('aria-expanded', 'false');
+}
 birdButton.addEventListener('click', () => (perch.classList.contains('open') ? closePerch() : openPerch()));
+appearanceButton.addEventListener('click', () =>
+  appearancePanel.classList.contains('open') ? closeAppearance() : openAppearance(),
+);
+for (const input of appearanceInputs) {
+  input.addEventListener('input', () => setParagliderColor(input.dataset.paragliderColor, Number.parseInt(input.value.slice(1), 16)));
+}
+showAppearance();
 for (const type of ['pointermove', 'pointerdown', 'focusin', 'wheel']) perch.addEventListener(type, armPerchIdle, { passive: true });
 document.addEventListener('pointerdown', (e) => {
   if (!perch.contains(e.target) && !birdButton.contains(e.target)) closePerch();
+  if (!appearancePanel.contains(e.target) && !appearanceButton.contains(e.target)) closeAppearance();
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closePerch();
+  if (e.key === 'Escape') {
+    closePerch();
+    closeAppearance();
+  }
 });
 const muteButton = document.getElementById('muteBtn'),
   volumeSlider = document.getElementById('volume');
@@ -3957,6 +4018,7 @@ window.addEventListener('resize', () => {
     placePerch();
     markOverflow();
   }
+  if (appearancePanel.classList.contains('open')) placeAppearance();
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(renderScale());
@@ -4194,6 +4256,12 @@ window.__fly = {
   begin: () => beginBtn.click(),
   renderStyle: 'soft',
   birds: BIRDS.map((entry) => entry.id),
+  get appearance() {
+    return paragliderAppearance;
+  },
+  defaultAppearance: DEFAULT_PARAGLIDER,
+  appearanceColors: PARAGLIDER_COLOR_KEYS,
+  setParagliderColor,
   get bird() {
     return birdKindId;
   },

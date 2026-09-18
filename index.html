@@ -332,7 +332,8 @@
       }
       /* The perch: the bird chooser, two strips above the controls line - the
          kinds' shapes over the chosen kind's colors. */
-      #perch {
+      #perch,
+      #appearance {
         position: fixed;
         left: max(1rem, env(safe-area-inset-left));
         bottom: calc(max(0.7rem, env(safe-area-inset-bottom)) + 3.55rem);
@@ -357,7 +358,8 @@
           transform 0.4s ease,
           visibility 0s linear 0.4s;
       }
-      #perch.open {
+      #perch.open,
+      #appearance.open {
         opacity: 1;
         transform: none;
         visibility: visible;
@@ -478,6 +480,47 @@
       #perchPlumages .tile.own {
         margin-right: 0.35rem;
       }
+      #appearance {
+        width: min(430px, calc(100% - max(1rem, env(safe-area-inset-left)) - max(1rem, env(safe-area-inset-right))));
+        padding: 0.75rem;
+      }
+      .appearanceTitle {
+        margin: 0 0 0.55rem 0.15rem;
+        font-size: 0.58rem;
+        font-weight: 400;
+        letter-spacing: 0.22em;
+        text-transform: lowercase;
+        color: rgba(246, 242, 234, 0.68);
+      }
+      .appearanceGrid {
+        display: grid;
+        grid-template-columns: repeat(5, minmax(0, 1fr));
+        gap: 0.55rem 0.45rem;
+      }
+      .appearanceField {
+        display: grid;
+        justify-items: center;
+        gap: 0.22rem;
+        min-width: 0;
+        font-size: 0.58rem;
+        color: rgba(246, 242, 234, 0.8);
+      }
+      .appearanceField input {
+        width: 2.45rem;
+        height: 1.65rem;
+        padding: 2px;
+        border: 1px solid rgba(248, 242, 230, 0.5);
+        border-radius: 8px;
+        background: rgba(8, 18, 26, 0.35);
+        cursor: pointer;
+      }
+      .appearanceField input::-webkit-color-swatch-wrapper {
+        padding: 0;
+      }
+      .appearanceField input::-webkit-color-swatch {
+        border: 0;
+        border-radius: 5px;
+      }
       :focus-visible {
         outline: 2px solid #f1e5b8;
         outline-offset: 5px;
@@ -567,6 +610,21 @@
         <div class="perchRail" aria-hidden="true"><div></div></div>
       </div>
     </div>
+    <div id="appearance" inert role="group" aria-label="Customize paraglider appearance">
+      <h2 class="appearanceTitle">paraglider appearance</h2>
+      <div class="appearanceGrid">
+        <label class="appearanceField"><input type="color" data-paraglider-color="canopyPrimary" aria-label="Canopy primary color" /><span>canopy</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="canopySecondary" aria-label="Canopy accent color" /><span>accent</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="canopyPattern" aria-label="Canopy pattern color" /><span>pattern</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="jacket" aria-label="Top color" /><span>top</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="pants" aria-label="Pants color" /><span>pants</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="helmet" aria-label="Headwear color" /><span>headwear</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="harness" aria-label="Harness color" /><span>harness</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="sunglasses" aria-label="Sunglasses color" /><span>glasses</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="gloves" aria-label="Gloves color" /><span>gloves</span></label>
+        <label class="appearanceField"><input type="color" data-paraglider-color="shoes" aria-label="Shoes color" /><span>shoes</span></label>
+      </div>
+    </div>
     <div id="hud" inert>
       <a id="shareLink" href="#" title="A link to this exact world">share this world</a>
       <button id="muteBtn" aria-label="Mute sound" title="Toggle sound" aria-pressed="false">sound on</button>
@@ -575,6 +633,7 @@
         pause
       </button>
       <button id="birdBtn" aria-label="Change companion birds" title="Choose the companion flock" aria-expanded="false" aria-controls="perch">flock: gull</button>
+      <button id="appearanceBtn" aria-label="Customize paraglider appearance" title="Customize paraglider appearance" aria-expanded="false" aria-controls="appearance">appearance</button>
       <span id="backendLabel" class="dim"></span>
     </div>
 

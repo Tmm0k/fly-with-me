@@ -1261,18 +1261,28 @@ async function flightChecks() {
     const birds = z.library.birds,
       birdButton = doc.getElementById('birdBtn');
     const rig = z.objects.paraglider,
-      parts = rig.userData.parts,
       colors = rig.userData.appearance.colors,
-      playerChildren = [...rig.children],
       animationState = rig.userData.animation;
+    let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers'].every((name) => parts[name]),
-      'the player is a paraglider with separately addressable canopy, pilot, harness, lines, risers and arms',
+        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers', 'shoes'].every((name) => parts[name]),
+      'the player is a paraglider with separately addressable canopy, pilot, harness, lines, risers, arms and shoes',
     );
     assert(
-      ['canopyPrimary', 'canopySecondary', 'canopyPattern', 'jacket', 'pants', 'helmet', 'harness', 'sunglasses', 'gloves'].every((name) => Number.isInteger(colors[name])),
+      z.appearanceColors.length === 10 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
       'every requested paraglider cosmetic has an independent configured color',
+    );
+    assert(
+      z.appearanceColors.every((name) => colors[name] === z.defaultAppearance.colors[name]) &&
+        colors.jacket < 0x303030 && colors.pants === 0x765238 && colors.shoes === 0xf2f0e8,
+      'the default pilot uses the dark top and headwear, brown pants and white shoes',
+    );
+    assert(
+      parts.shoes.children.map((child) => child.name).join() === 'shoe-uppers,shoe-soles' &&
+        parts.shoes.children.every((child) => child.geometry.attributes.position.count > 0) &&
+        parts.shoes.parent === parts.pilot && parts.pilot.getObjectByName('seated-legs') !== parts.shoes,
+      'modeled shoe uppers and soles are a distinct pilot feature',
     );
     assert(
       !rig.userData.wings && rig.children.every((child) => ['canopy', 'pilot', 'suspension-lines'].includes(child.name)),
@@ -1345,10 +1355,40 @@ async function flightChecks() {
     assert(lineError() < 0.001, 'dynamic lines remain attached after the rig settles');
     assert(!doc.getElementById('hud').inert && birdButton.textContent.includes(birds[0].name), 'after Begin the flock control is in reach and names the first kind');
     const before = z.objects.bird.position.clone();
-    const perch = doc.getElementById('perch');
+    const perch = doc.getElementById('perch'),
+      appearancePanel = doc.getElementById('appearance'),
+      appearanceButton = doc.getElementById('appearanceBtn'),
+      appearanceInputs = [...appearancePanel.querySelectorAll('[data-paraglider-color]')];
+    assert(appearancePanel.inert && !appearancePanel.classList.contains('open'), 'the appearance controls are closed and inert until requested');
+    appearanceButton.click();
+    assert(
+      appearancePanel.classList.contains('open') && !appearancePanel.inert && appearanceInputs.length === z.appearanceColors.length,
+      'the HUD opens one compact color control for every paraglider appearance slot',
+    );
+    const chooseColor = (key, value) => {
+      const input = appearanceInputs.find((field) => field.dataset.paragliderColor === key);
+      input.value = value;
+      input.dispatchEvent(new win.Event('input', { bubbles: true }));
+    };
+    chooseColor('jacket', '#315a7d');
+    chooseColor('shoes', '#e7d36f');
+    parts = rig.userData.parts;
+    const playerChildren = [...rig.children],
+      chosenAppearance = { ...z.appearance.colors };
+    assert(
+      z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.shoes === 0xe7d36f &&
+        rig.userData.appearance.colors.jacket === 0x315a7d && rig.userData.animation === animationState,
+      'appearance controls recolor the visible rig without replacing its pivot or maneuver state',
+    );
+    assert(parts.shoes !== undefined && parts.shoes.children.length === 2, 'appearance rebuilding retains the modeled shoes');
+    for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
+    assert(parts.canopy.rotation.z > 0.04 && lineError() < 0.001, 'maneuver animation and moving lines continue after an appearance change');
     assert(perch.inert && !perch.classList.contains('open'), 'the perch is closed and out of reach until the control opens it');
     birdButton.click();
-    assert(perch.classList.contains('open') && !perch.inert, 'the corner control opens the perch');
+    assert(
+      perch.classList.contains('open') && !perch.inert && !appearancePanel.classList.contains('open') && appearancePanel.inert,
+      'the corner control opens the perch and closes the appearance panel',
+    );
     const kindTiles = [...perch.querySelectorAll('#perchKinds .tile[data-kind]')],
       colorTiles = () => [...perch.querySelectorAll('#perchPlumages .tile[data-variant]')];
     assert(
@@ -1377,8 +1417,9 @@ async function flightChecks() {
     assert(
       z.objects.bird.position.distanceTo(before) < 0.000001 &&
         playerChildren.every((child, i) => z.objects.bird.children[i] === child) &&
-        z.objects.bird.userData.animation === animationState,
-      'changing the flock leaves the paraglider animation and hierarchy intact and where it was',
+        z.objects.bird.userData.animation === animationState &&
+        z.appearanceColors.every((key) => z.appearance.colors[key] === chosenAppearance[key]),
+      'changing the flock leaves paraglider appearance, animation and hierarchy intact and where it was',
     );
     const pivot = z.objects.companions[0].userData.wings[0].pivots[0],
       hinge = pivot.rotation.z;
@@ -1433,6 +1474,7 @@ async function flightChecks() {
     cam: { yaw: z.cam.yaw, pitch: z.cam.pitch, dist: z.cam.dist },
     bird: z.bird,
     plumage: z.plumage,
+    appearance: { ...z.appearance.colors },
   };
   const disposal = z.dispose();
   await disposal;
@@ -1480,6 +1522,12 @@ async function flightChecks() {
       again.doc.getElementById('birdBtn').textContent.includes(again.z.library.birds[1].name),
     'the bird and its plumage are remembered',
   );
+  assert(
+    again.z.appearanceColors.every((key) => again.z.appearance.colors[key] === left.appearance[key]) &&
+      again.doc.querySelector('[data-paraglider-color="jacket"]').value === '#315a7d' &&
+      again.doc.querySelector('[data-paraglider-color="shoes"]').value === '#e7d36f',
+    'paraglider appearance and its controls are restored on reload',
+  );
   assert(!again.z.running && again.z.audioState === 'not-created', 'a remembered flight still waits for Begin');
   assert(
     again.doc.getElementById('begin').classList.contains('ready') && !again.doc.getElementById('beginBtn').disabled,
@@ -1504,9 +1552,28 @@ async function flightChecks() {
     new URL(fresh.win.location.href).searchParams.get('seed') === String((left.seed + 1) >>> 0),
     'an explicit seed stays in the address as given',
   );
-  assert(fresh.z.volume === 0.4 && fresh.z.muted && fresh.z.bird === left.bird && fresh.z.plumage === left.plumage, 'settings carry over to another world, the bird and its plumage included');
+  assert(
+    fresh.z.volume === 0.4 && fresh.z.muted && fresh.z.bird === left.bird && fresh.z.plumage === left.plumage &&
+      fresh.z.appearanceColors.every((key) => fresh.z.appearance.colors[key] === left.appearance[key]),
+    'settings carry over to another world, including flock and paraglider appearance',
+  );
   assert(fresh.z.intro.beat === 'side', 'another world opens with the opening again');
   await closeWorld(fresh);
+
+  const damagedSettings = JSON.parse(localStorage.getItem('fly-with-me-settings'));
+  damagedSettings.paraglider.colors.jacket = 'not-a-color';
+  damagedSettings.paraglider.colors.shoes = 0x1000000;
+  localStorage.setItem('fly-with-me-settings', JSON.stringify(damagedSettings));
+  const sanitizedUrl = new URL(location.href);
+  sanitizedUrl.searchParams.set('seed', String((left.seed + 2) >>> 0));
+  const sanitized = await openWorld(sanitizedUrl.href);
+  assert(
+    sanitized.z.appearance.colors.jacket === sanitized.z.defaultAppearance.colors.jacket &&
+      sanitized.z.appearance.colors.shoes === sanitized.z.defaultAppearance.colors.shoes &&
+      sanitized.z.appearance.colors.pants === left.appearance.pants,
+    'invalid stored appearance colors fall back independently without discarding valid choices',
+  );
+  await closeWorld(sanitized);
   localStorage.clear();
 
   // The opening, as a first visitor sees it: nothing remembered, the default
