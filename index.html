@@ -172,45 +172,6 @@
         opacity: 0.35;
         cursor: default;
       }
-      /* The title card, drawn by the engine on the opening's beat. */
-      #title {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 1.1rem;
-        padding: 0 24px 15vh;
-        pointer-events: none;
-        z-index: 4;
-      }
-      #title p {
-        margin: 0;
-        opacity: 0;
-        text-align: center;
-        will-change: opacity, transform, filter;
-      }
-      #titlePresents {
-        font-size: 0.78rem;
-        letter-spacing: 0.46em;
-        text-indent: 0.46em;
-        text-transform: uppercase;
-        color: #f3ece0;
-        text-shadow: 0 1px 12px rgba(8, 18, 26, 0.7);
-      }
-      #titleName {
-        font-family: Georgia, 'Times New Roman', serif;
-        font-weight: 300;
-        font-size: clamp(2.8rem, 7.6vw, 5.6rem);
-        letter-spacing: 0.12em;
-        text-indent: 0.12em;
-        line-height: 1.1;
-        color: #f8f2e6;
-        text-shadow:
-          0 2px 28px rgba(8, 18, 26, 0.55),
-          0 0 2px rgba(8, 18, 26, 0.35);
-      }
       #hud {
         position: fixed;
         left: max(1rem, env(safe-area-inset-left));
@@ -535,9 +496,6 @@
           padding: 0.6rem 1.8rem;
           min-height: 44px;
         }
-        #title {
-          padding-bottom: 8vh;
-        }
       }
       @media (prefers-reduced-motion: reduce) {
         *,
@@ -567,10 +525,6 @@
       role="img"
       aria-label="An autonomous paraglider flight. Left-drag looks around, right-drag steers, arrow keys nudge; space pauses or resumes."
     ></canvas>
-    <div id="title" aria-hidden="true">
-      <p id="titlePresents">Kun Chen Presents</p>
-      <p id="titleName">Fly With Me</p>
-    </div>
     <div id="begin">
       <button id="beginBtn" disabled>begin</button>
       <p class="hint">

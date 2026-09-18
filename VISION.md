@@ -41,7 +41,7 @@ No frame rate is promised anywhere.
 Looks are explored side by side, one is approved on a review board, and the rest leave the page, kept only in history and as fixed reference studies.
 No look switch or alternative rendering mode ships; the approved reference is what a change is compared against, and the laptop's picture is that reference.
 Visual quality is ensured by human review in a real browser: a change to the approved rendering, water or sky shows its before and after at the same seed and vantage, read from the finished picture, and is judged by eye before it is judged by numbers.
-Rarity stays rare; a ruin, a low pass, a night turn or a title card is never made louder or more frequent so that it is seen more.
+Rarity stays rare; a ruin, a low pass or a night turn is never made louder or more frequent so that it is seen more.
 The viewer's hand outranks the flight's plan, and the camera sits rigid on the bird and never recenters itself.
 
 ## The engine serves the experience, and the library makes it easy to extend

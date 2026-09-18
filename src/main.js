@@ -2668,46 +2668,6 @@ function endIntro(how) {
   cloudOrigin = state.t;
   dayRateTarget = 1;
 }
-// The title card. Three seconds into the turn toward the sunrise, "Kun Chen
-// Presents" and then "Fly With Me" come up out of a soft blur, hold while the
-// sun clears the horizon and the bird faces it, and are gone before the
-// climb reaches the clouds. It belongs to the opening: it starts on its beat
-// only while the opening is still playing, and once started it finishes even
-// if the viewer steers, since a card cut off halfway reads as a fault. It runs
-// on the simulation clock, so a pause holds it and the checks can step through it.
-const TITLE = {
-  at: INTRO.side + 3, // seconds after Begin: three seconds into the turn toward the sun
-  presents: [0, 2.6], // seconds after `at` over which the small line comes up
-  name: [1.6, 5.6], // the title, fully up a few seconds after the sun crests
-  out: [11.5, 15], // both fade away
-};
-const title = { started: false, done: false, presents: 0, name: 0 };
-const titleCard = {
-  presents: document.getElementById('titlePresents'),
-  name: document.getElementById('titleName'),
-};
-function updateTitle() {
-  if (title.done) return;
-  const t = state.t - TITLE.at;
-  if (!title.started) {
-    if (!intro.beat || t < 0) return;
-    title.started = true;
-  }
-  const fall = 1 - sstep(TITLE.out[0], TITLE.out[1], t);
-  const up = sstep(TITLE.name[0], TITLE.name[1], t);
-  title.presents = sstep(TITLE.presents[0], TITLE.presents[1], t) * fall;
-  title.name = up * fall;
-  titleCard.presents.style.opacity = title.presents.toFixed(3);
-  titleCard.name.style.opacity = title.name.toFixed(3);
-  // the title sharpens as it comes up and drifts a little larger the whole
-  // time it is on screen; a viewer who asked for less motion gets the fade alone
-  if (!reducedMotion) {
-    const drift = sstep(TITLE.name[0], TITLE.out[1], t);
-    titleCard.name.style.filter = `blur(${((1 - up) * 12).toFixed(2)}px)`;
-    titleCard.name.style.transform = `scale(${(0.955 + 0.06 * drift).toFixed(4)})`;
-  }
-  if (t >= TITLE.out[1]) title.done = true;
-}
 // Now and then the bird drops for a low pass over gentle ground, then climbs back.
 const flight = { lowNext: 160, lowUntil: 0, low: false, lowAmount: 0 };
 function updateFlight(dt) {
@@ -3605,7 +3565,6 @@ const push = (list, value) => {
 function advance(dt, sound = true) {
   if (disposed || !Number.isFinite(dt) || dt <= 0 || dt > 0.05) return;
   updateFlight(dt);
-  updateTitle();
   time.value = state.t;
   updateHeightfield(state.x, state.z);
   updatePlumes(state.t);
@@ -3938,8 +3897,6 @@ window.__fly = {
   aim: AIM,
   intro,
   opening: INTRO,
-  title,
-  titleCard: TITLE,
   get ready() {
     return ready;
   },

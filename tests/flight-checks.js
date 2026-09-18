@@ -59,7 +59,7 @@ async function flightChecks() {
     gate.classList.contains('ready') && !gate.classList.contains('gone') && !gate.inert && !doc.getElementById('beginBtn').disabled,
     'the gate stands on the drawn world with Begin ready',
   );
-  assert(!z.title.started && z.title.name === 0 && z.title.presents === 0, 'no title card before Begin');
+  assert(!doc.getElementById('title'), 'the removed intro title has no DOM or loading-state placeholder');
   assert(
     doc.getElementById('hud').inert && z.objects.bird === z.objects.paraglider && z.objects.bird.name === 'paraglider',
     'before Begin the sole player subject is the paraglider',
@@ -126,18 +126,17 @@ async function flightChecks() {
   assert(z.audioState === 'running', 'visibility handler resumes audio');
   const canvas = doc.getElementById('c');
   assert(['side', 'pivot'].includes(z.intro.beat), 'the opening is under way when the viewer first steers');
-  const T = z.titleCard,
-    O0 = z.opening;
+  const O0 = z.opening;
   while (z.state.t < O0.side + 0.5) z.step(0.05);
   assert(
-    z.intro.beat === 'pivot' && !z.title.started && z.title.presents === 0,
-    'the title card stays hidden for the first three seconds of the turn',
+    z.intro.beat === 'pivot' && !doc.getElementById('title'),
+    'the sunrise turn begins without an intro title',
     `t ${z.state.t.toFixed(1)}`,
   );
   while (z.state.t < O0.side + 3.5) z.step(0.05);
   assert(
-    z.intro.beat === 'pivot' && z.title.started && z.title.presents > 0 && z.title.name < 1,
-    'the title card begins three seconds into the turn toward the sun',
+    z.intro.beat === 'pivot' && !doc.getElementById('title'),
+    'the opening remains visually clear during the turn toward the sun',
     `t ${z.state.t.toFixed(1)}`,
   );
   canvas.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
@@ -164,21 +163,8 @@ async function flightChecks() {
     'pause stops simulation, rendering and audio',
   );
 
-  {
-    // A title card that has begun finishes even though the steer ended the
-    // opening: it comes fully up, holds, and is gone, on the simulation clock.
-    const titleName = doc.getElementById('titleName');
-    while (z.state.t < O0.side + 3 + T.name[1]) z.step(0.05);
-    assert(
-      z.title.name === 1 && z.title.presents === 1 && Number(titleName.style.opacity) === 1,
-      'the steered opening still brings the title card fully up',
-    );
-    while (z.state.t < O0.side + 3 + T.out[1]) z.step(0.05);
-    assert(
-      z.title.done && z.title.name === 0 && Number(titleName.style.opacity) === 0 && !z.intro.beat,
-      'the title card fades away and leaves the flight clear',
-    );
-  }
+  while (z.state.t < O0.side + 18) z.step(0.05);
+  assert(!doc.getElementById('title') && !z.intro.beat, 'a steered opening stays clear of intro text');
 
   // The scenery library and the biomes it describes. The library validates
   // clean, and refuses a contribution outside the palette envelope or with an
@@ -1539,7 +1525,7 @@ async function flightChecks() {
   if (again.z.paused) again.doc.getElementById('pauseBtn').click();
   await wait(400);
   assert(again.z.state.t > left.t && again.z.state.t < left.t + 5, 'Begin continues the remembered clock');
-  assert(!again.z.title.started && again.z.title.name === 0, 'a remembered flight never shows the title card');
+  assert(!again.doc.getElementById('title'), 'a remembered flight contains no intro title');
   assert(again.z.masterGain < 0.0001, 'remembered sound off keeps the audio silent');
   await closeWorld(again);
   // An explicit seed in the address always wins; only the settings carry over.
@@ -1605,20 +1591,17 @@ async function flightChecks() {
     f.intro.beat === 'side' && Math.abs(wrapAngle(f.state.heading - startHeading)) < 0.01 && Math.abs(f.dayRate - 1) < 0.001,
     'the bird holds its course for the first five seconds at the day\'s own pace',
   );
-  const FT = f.titleCard,
-    titleName = first.doc.getElementById('titleName'),
-    titlePresents = first.doc.getElementById('titlePresents');
-  assert(!f.title.started && titleName.style.opacity === '' && titlePresents.style.opacity === '', 'no title card while the bird holds its course');
+  assert(!first.doc.getElementById('title'), 'the opening contains no intro title while the bird holds its course');
   let maxTurn = 0;
   stepTo(O.side + 0.5);
   assert(
-    f.intro.beat === 'pivot' && !f.title.started && f.title.presents === 0 && titleName.style.opacity === '',
-    'the title card stays hidden for the first three seconds of the turn toward the sun',
+    f.intro.beat === 'pivot' && !first.doc.getElementById('title'),
+    'the turn toward the sun begins without intro text',
   );
   stepTo(O.side + 3.5);
   assert(
-    f.intro.beat === 'pivot' && f.title.started && f.title.presents > 0 && f.title.name === 0 && Number(titlePresents.style.opacity) > 0 && Number(titleName.style.opacity) === 0,
-    '"Kun Chen Presents" starts to come up three seconds into the turn, ahead of the title',
+    f.intro.beat === 'pivot' && !first.doc.getElementById('title'),
+    'the opening remains free of intro text during the sunrise turn',
   );
   const turnUntil = (t) => {
     while (f.state.t < t) {
@@ -1628,27 +1611,15 @@ async function flightChecks() {
   };
   turnUntil(O.beforeSunrise - 0.3);
   assert(f.intro.beat === 'pivot' && f.sky.sun.y < 0, 'the turn toward the sun begins before it rises');
-  assert(f.title.presents > 0 && f.title.presents < 1 && f.title.name < 0.1, 'Kun Chen Presents is still coming up as the sun reaches the horizon');
   turnUntil(O.beforeSunrise + 0.3);
   assert(f.sky.sun.y > 0, 'the sun crosses the horizon ten seconds in, during the turn');
   turnUntil(O.climbAt + 0.05);
-  assert(f.intro.beat === 'climb' && f.title.name > 0.9 && f.title.name < 1, 'the title is still coming up as the bird, facing the risen sun, begins to climb');
-  stepTo(O.side + 3 + FT.name[1] + 0.05);
-  assert(
-    f.title.name === 1 && f.sky.sun.y > 0 && f.intro.beat === 'climb' && Number(titleName.style.opacity) === 1 && Number(titlePresents.style.opacity) === 1,
-    'the title stands fully up after the sun has crested, as the bird begins its climb',
-  );
+  assert(f.intro.beat === 'climb' && f.sky.sun.y > 0 && !first.doc.getElementById('title'), 'the clear sunrise view continues as the climb begins');
   turnUntil(O.climbAt + 4);
   assert(maxTurn > 0.15 && maxTurn < 0.21, 'the turn is a real bank, capped at the sunrise pull\'s rate', `${maxTurn.toFixed(3)}`);
   assert(f.intro.beat === 'climb' && offSun() < 0.1 && f.state.vy > 5, 'facing the sun, the bird climbs');
   stepTo(O.climbAt + 12);
   assert(Math.abs(f.dayRate - O.stretch) < 0.02, 'the day is stretched while the bird climbs', `${f.dayRate.toFixed(2)}`);
-  stepTo(O.side + 3 + FT.out[1] + 0.05);
-  assert(
-    f.title.done && f.title.name === 0 && f.title.presents === 0 && Number(titleName.style.opacity) === 0 && f.intro.beat === 'climb',
-    'the title card is gone before the climb reaches the clouds',
-    `${f.state.y.toFixed(0)} m`,
-  );
   let climbSteps = 0;
   while (f.intro.beat === 'climb' && climbSteps++ < 1400) f.step(0.05);
   const deck = f.objects.cloudSea.position.y + 55;

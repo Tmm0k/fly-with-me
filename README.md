@@ -52,4 +52,4 @@
 
 ## License
 
-[MIT](LICENSE) © Kun Chen. Three.js is loaded from a CDN and carries its own license.
+[MIT](LICENSE). Three.js is loaded from a CDN and carries its own license.

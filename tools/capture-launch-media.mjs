@@ -15,11 +15,8 @@
 //
 // How it records, and why it records that way:
 //
-//   * The film is the engine's canvas composited with the page's own title
-//     card, drawn into a second canvas that is what MediaRecorder sees. A
-//     canvas stream cannot carry the page's HTML layers, so the title is
-//     lifted out of this very DOM as a transparent plate and drawn each frame
-//     at the opacity, blur and scale the engine is giving it.
+//   * The film is the engine's canvas drawn into a second canvas that is what
+//     MediaRecorder sees.
 //   * The veil, the Begin gate and the controls are simply never drawn into
 //     that composite. They must stay visible in the page: with nothing painted
 //     over it the engine's canvas is composited straight to the screen, and
@@ -287,7 +284,6 @@ function harness() {
     bytes: 0,
     frames: 0,
     rate: 0,
-    plates: {},
   };
   window.__capture = CAP;
 
@@ -334,28 +330,12 @@ function harness() {
     return out;
   };
 
-  const $ = (id) => document.getElementById(id);
-  const number = (text, re) => {
-    const m = re.exec(text || '');
-    return m ? parseFloat(m[1]) : null;
-  };
-
   let mix = null,
     paint = null,
     recorder = null,
     track = null,
     chunks = [],
     running = false;
-
-  CAP.setPlates = async (plates) => {
-    for (const plate of plates) {
-      const image = new Image();
-      image.src = plate.dataUrl;
-      await image.decode();
-      CAP.plates[plate.key] = { bitmap: await createImageBitmap(image), rect: plate.rect };
-    }
-    return Object.keys(CAP.plates);
-  };
 
   CAP.prepare = (width, height) => {
     mix = document.createElement('canvas');
@@ -366,35 +346,10 @@ function harness() {
   };
 
   function composite() {
-    const canvas = $('c');
+    const canvas = document.getElementById('c');
     paint.globalAlpha = 1;
     paint.filter = 'none';
     paint.drawImage(canvas, 0, 0, mix.width, mix.height);
-    // The title card, at the opacity, blur and scale the engine is giving it.
-    const presents = $('titlePresents'),
-      name = $('titleName');
-    const pOpacity = parseFloat(getComputedStyle(presents).opacity) || 0;
-    if (pOpacity > 0.002 && CAP.plates.presents) {
-      paint.globalAlpha = Math.min(1, pOpacity);
-      paint.drawImage(CAP.plates.presents.bitmap, 0, 0, mix.width, mix.height);
-      paint.globalAlpha = 1;
-    }
-    const nOpacity = parseFloat(getComputedStyle(name).opacity) || 0;
-    const plate = CAP.plates.name;
-    if (nOpacity > 0.002 && plate) {
-      const blur = number(name.style.filter, /blur\(([\d.]+)px\)/) || 0;
-      const scale = number(name.style.transform, /scale\(([\d.]+)\)/) || 1;
-      const cx = plate.rect.x + plate.rect.width / 2,
-        cy = plate.rect.y + plate.rect.height / 2;
-      paint.save();
-      paint.globalAlpha = Math.min(1, nOpacity);
-      if (blur > 0.01) paint.filter = 'blur(' + blur.toFixed(2) + 'px)';
-      paint.translate(cx, cy);
-      paint.scale(scale, scale);
-      paint.translate(-cx, -cy);
-      paint.drawImage(plate.bitmap, 0, 0, mix.width, mix.height);
-      paint.restore();
-    }
     CAP.frames++;
   }
 
@@ -461,48 +416,6 @@ function harness() {
   };
 }
 
-// The page's title card, lifted out of this DOM as a transparent plate: it is
-// the real rendering, so the film carries the real type, kerning and shadow.
-const PLATES = {
-  presents:
-    '#title{display:flex!important}#titlePresents{opacity:1!important;filter:none!important;transform:none!important}#titleName{opacity:0!important}',
-  name: '#title{display:flex!important}#titleName{opacity:1!important;filter:none!important;transform:none!important}#titlePresents{opacity:0!important}',
-};
-const PLATE_BASE =
-  '*{transition:none!important;animation:none!important}html,body{background:transparent!important}' +
-  '#c{visibility:hidden!important}#loading,#begin,#title,#hud{display:none!important}';
-
-async function liftPlates(chrome) {
-  const rects = await chrome.evaluate(() => {
-    const box = (id) => {
-      const b = document.getElementById(id).getBoundingClientRect();
-      return { x: b.x, y: b.y, width: b.width, height: b.height };
-    };
-    return { presents: box('titlePresents'), name: box('titleName') };
-  });
-  await chrome.call('Emulation.setDefaultBackgroundColorOverride', { color: { r: 0, g: 0, b: 0, a: 0 } });
-  const plates = [];
-  for (const [key, css] of Object.entries(PLATES)) {
-    await chrome.evaluate(
-      (all) => {
-        let sheet = document.getElementById('capture-plate');
-        if (!sheet) {
-          sheet = document.createElement('style');
-          sheet.id = 'capture-plate';
-          document.head.appendChild(sheet);
-        }
-        sheet.textContent = all;
-      },
-      PLATE_BASE + css,
-    );
-    const png = await chrome.screenshot();
-    plates.push({ key, rect: rects[key], dataUrl: 'data:image/png;base64,' + png.toString('base64') });
-  }
-  await chrome.evaluate(() => document.getElementById('capture-plate')?.remove());
-  await chrome.call('Emulation.setDefaultBackgroundColorOverride');
-  return plates;
-}
-
 // ---------------------------------------------------------------------------
 // The two passes
 // ---------------------------------------------------------------------------
@@ -522,9 +435,6 @@ async function recordFlight(opts, url, capture) {
       throw new Error(`the engine is drawing ${framing.canvas.join('x')}, not ${WIDTH}x${HEIGHT}`);
     say(`world ready on ${framing.backend}, drawing ${framing.canvas.join('x')}`);
 
-    say('lifting the title card');
-    const plates = await liftPlates(chrome);
-    await chrome.evaluate((list) => window.__capture.setPlates(list), plates);
     await chrome.evaluate((w, h) => window.__capture.prepare(w, h), WIDTH, HEIGHT);
     await chrome.evaluate((fps) => window.__capture.capFrames(fps), opts.fps);
 
@@ -558,7 +468,7 @@ async function captureHero(opts, url) {
     // hiding the page's own layers here costs nothing
     await chrome.evaluate(() => {
       const sheet = document.createElement('style');
-      sheet.textContent = '#hud,#title,#begin,#loading{display:none!important}';
+      sheet.textContent = '#hud,#begin,#loading{display:none!important}';
       document.head.appendChild(sheet);
     });
     say(`flying to ${opts.heroAt}s for the still`);
