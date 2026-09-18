@@ -1266,8 +1266,8 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
-      'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses and shoes',
+        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+      'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses, gloves and shoes',
     );
     assert(
       z.appearanceColors.length === 11 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
@@ -1283,6 +1283,17 @@ async function flightChecks() {
         parts.shoes.children.every((child) => child.geometry.attributes.position.count > 0) &&
         parts.shoes.parent === parts.pilot && parts.pilot.getObjectByName('seated-legs') !== parts.shoes,
       'modeled shoe uppers and soles are a distinct pilot feature',
+    );
+    const pilotMeshes = [];
+    parts.pilot.traverse((part) => {
+      if (part.geometry) pilotMeshes.push(part);
+    });
+    assert(
+      parts.head.children.map((child) => child.name).join() === 'skin,headwear,sunglasses' &&
+        parts.leftGlove.name === 'glove' && parts.rightGlove.name === 'glove' &&
+        pilotMeshes.length >= 14 && pilotMeshes.every((part) =>
+          [...part.geometry.attributes.position.array].every(Number.isFinite)),
+      'the refined avatar keeps independent face accessories and gloves with only finite pilot vertices',
     );
     assert(
       !rig.userData.wings && rig.children.every((child) => ['canopy', 'pilot', 'suspension-lines'].includes(child.name)),
