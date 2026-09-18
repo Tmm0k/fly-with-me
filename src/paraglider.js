@@ -16,6 +16,7 @@ export const DEFAULT_PARAGLIDER = {
     sunglasses: 0x111317,
     gloves: 0x292d32,
     shoes: 0xf2f0e8,
+    skin: 0xb98268,
   },
   below: 1.35,
   bob: 0.035,
@@ -33,6 +34,7 @@ export const PARAGLIDER_COLOR_KEYS = [
   'sunglasses',
   'gloves',
   'shoes',
+  'skin',
 ];
 
 export function normalizeParagliderAppearance(appearance) {
@@ -396,23 +398,39 @@ export function createParaglider(appearance, kit) {
   const head = new THREE.Group();
   head.name = 'head';
   head.position.set(0, 1.3, -0.38);
-  head.add(
-    mesh(
-      THREE,
-      merge([
-        { geometry: new THREE.SphereGeometry(1, 14, 9), matrix: M(0, -0.01, 0, 0.25, 0.29, 0.26), color: 0xb98268 },
-        { geometry: new THREE.SphereGeometry(1, 16, 10), matrix: M(0, 0.11, -0.035, 0.3, 0.255, 0.31), color: colors.helmet },
-        { geometry: new THREE.CylinderGeometry(0.285, 0.285, 0.075, 16), matrix: M(0, -0.055, -0.02), color: colors.helmet },
-        { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(-0.255, -0.025, 0.005, 0.045, 0.085, 0.055), color: 0xb98268 },
-        { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(0.255, -0.025, 0.005, 0.045, 0.085, 0.055), color: 0xb98268 },
-        { geometry: new THREE.BoxGeometry(0.51, 0.085, 0.075), matrix: M(0, 0.005, 0.245), color: colors.sunglasses },
-        { geometry: new THREE.SphereGeometry(1, 8, 5), matrix: M(0, -0.07, 0.255, 0.045, 0.055, 0.055), color: 0xa86f58 },
-        { geometry: new THREE.BoxGeometry(0.42, 0.05, 0.17), matrix: M(0, 0.18, 0.21, 1, 1, 1, -0.12, 0, 0), color: colors.helmet },
-      ]),
-      material,
-      'headwear-and-sunglasses',
-    ),
+  const skin = mesh(
+    THREE,
+    merge([
+      { geometry: new THREE.SphereGeometry(1, 14, 10), matrix: M(0, -0.015, 0.005, 0.245, 0.29, 0.255), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(-0.255, -0.025, 0.005, 0.045, 0.085, 0.055), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(0.255, -0.025, 0.005, 0.045, 0.085, 0.055), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 8, 5), matrix: M(0, -0.075, 0.255, 0.043, 0.055, 0.052), color: colors.skin },
+      { geometry: new THREE.CylinderGeometry(0.115, 0.14, 0.17, 12), matrix: M(0, -0.325, -0.02), color: colors.skin },
+    ]),
+    material,
+    'skin',
   );
+  const headwear = mesh(
+    THREE,
+    merge([
+      { geometry: new THREE.SphereGeometry(1, 16, 10), matrix: M(0, 0.115, -0.04, 0.3, 0.255, 0.31), color: colors.helmet },
+      { geometry: new THREE.CylinderGeometry(0.285, 0.285, 0.075, 16), matrix: M(0, -0.055, -0.02), color: colors.helmet },
+      { geometry: new THREE.BoxGeometry(0.42, 0.05, 0.17), matrix: M(0, 0.18, 0.21, 1, 1, 1, -0.12, 0, 0), color: colors.helmet },
+    ]),
+    material,
+    'headwear',
+  );
+  const sunglasses = mesh(
+    THREE,
+    merge([
+      { geometry: new THREE.BoxGeometry(0.2, 0.09, 0.072), matrix: M(-0.13, 0.008, 0.245), color: colors.sunglasses },
+      { geometry: new THREE.BoxGeometry(0.2, 0.09, 0.072), matrix: M(0.13, 0.008, 0.245), color: colors.sunglasses },
+      { geometry: new THREE.BoxGeometry(0.075, 0.025, 0.075), matrix: M(0, 0.015, 0.247), color: colors.sunglasses },
+    ]),
+    material,
+    'sunglasses',
+  );
+  head.add(skin, headwear, sunglasses);
   pilot.add(head);
 
   const left = limb(THREE, material, merge, colors.jacket, colors.gloves, -1);
@@ -513,6 +531,9 @@ export function createParaglider(appearance, kit) {
     rightForearm: right.forearm,
     risers,
     head,
+    skin,
+    headwear,
+    sunglasses,
     shoes,
     canopySurface,
     cellOpenings,

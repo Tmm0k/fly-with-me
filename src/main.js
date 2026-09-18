@@ -500,6 +500,7 @@ function slopeAt(x, z) {
 // Renderer, scene, lights
 // ---------------------------------------------------------------------------
 const canvas = document.getElementById('c');
+let appearanceInputBlocked = false;
 // Multisampling belongs to the scene pass and nowhere else. `antialias` here
 // would also multisample the canvas, where the only thing ever drawn is one
 // full-screen quad: every sample of it takes the same shaded value and the
@@ -3040,7 +3041,7 @@ canvas.addEventListener(
   { passive: false },
 );
 window.addEventListener('keydown', (e) => {
-  if (e.target.closest('button, a, input') || !running) return;
+  if (appearanceInputBlocked || e.target.closest('button, a, input') || !running) return;
   if (e.code === 'Space') {
     e.preventDefault();
     togglePause();
@@ -3417,7 +3418,11 @@ const birdButton = document.getElementById('birdBtn'),
   plumageStrip = document.getElementById('perchPlumages'),
   appearanceButton = document.getElementById('appearanceBtn'),
   appearancePanel = document.getElementById('appearance'),
+  appearanceClose = document.getElementById('appearanceClose'),
   appearanceInputs = [...document.querySelectorAll('[data-paraglider-color]')],
+  appearancePreviewColors = [...document.querySelectorAll('[data-preview-color]')],
+  appearancePreviewStrokes = [...document.querySelectorAll('[data-preview-stroke]')],
+  skinPresets = [...document.querySelectorAll('[data-skin-preset]')],
   hudLine = document.getElementById('hud');
 const kindTiles = new Map(),
   tiles = new Map();
@@ -3514,12 +3519,9 @@ function armPerchIdle() {
 function placePerch() {
   perch.style.bottom = `${Math.round(window.innerHeight - hudLine.getBoundingClientRect().top + 8)}px`;
 }
-function placeAppearance() {
-  appearancePanel.style.bottom = `${Math.round(window.innerHeight - hudLine.getBoundingClientRect().top + 8)}px`;
-}
 function openPerch() {
   if (perch.classList.contains('open')) return;
-  closeAppearance();
+  closeAppearance(false);
   buildPerch();
   placePerch();
   perch.inert = false;
@@ -3541,6 +3543,10 @@ function closePerch() {
 const colorHex = (color) => `#${color.toString(16).padStart(6, '0')}`;
 function showAppearance() {
   for (const input of appearanceInputs) input.value = colorHex(paragliderAppearance.colors[input.dataset.paragliderColor]);
+  for (const part of appearancePreviewColors) part.setAttribute('fill', colorHex(paragliderAppearance.colors[part.dataset.previewColor]));
+  for (const part of appearancePreviewStrokes) part.setAttribute('stroke', colorHex(paragliderAppearance.colors[part.dataset.previewStroke]));
+  for (const preset of skinPresets)
+    preset.setAttribute('aria-pressed', String(Number.parseInt(preset.dataset.skinPreset, 16) === paragliderAppearance.colors.skin));
 }
 function setParagliderColor(key, value) {
   if (!PARAGLIDER_COLOR_KEYS.includes(key)) throw new Error('unknown paraglider color: ' + key);
@@ -3559,17 +3565,25 @@ function setParagliderColor(key, value) {
 function openAppearance() {
   if (appearancePanel.classList.contains('open')) return;
   closePerch();
-  placeAppearance();
   showAppearance();
+  endDrag();
+  appearanceInputBlocked = true;
+  canvas.inert = true;
   appearancePanel.inert = false;
+  appearancePanel.setAttribute('aria-hidden', 'false');
   appearancePanel.classList.add('open');
   appearanceButton.setAttribute('aria-expanded', 'true');
+  appearanceClose.focus();
 }
-function closeAppearance() {
+function closeAppearance(restoreFocus = true) {
   if (!appearancePanel.classList.contains('open')) return;
   appearancePanel.classList.remove('open');
   appearancePanel.inert = true;
+  appearancePanel.setAttribute('aria-hidden', 'true');
   appearanceButton.setAttribute('aria-expanded', 'false');
+  appearanceInputBlocked = false;
+  canvas.inert = !running;
+  if (restoreFocus) appearanceButton.focus();
 }
 birdButton.addEventListener('click', () => (perch.classList.contains('open') ? closePerch() : openPerch()));
 appearanceButton.addEventListener('click', () =>
@@ -3578,16 +3592,33 @@ appearanceButton.addEventListener('click', () =>
 for (const input of appearanceInputs) {
   input.addEventListener('input', () => setParagliderColor(input.dataset.paragliderColor, Number.parseInt(input.value.slice(1), 16)));
 }
+for (const preset of skinPresets)
+  preset.addEventListener('click', () => setParagliderColor('skin', Number.parseInt(preset.dataset.skinPreset, 16)));
+appearanceClose.addEventListener('click', () => closeAppearance());
+appearancePanel.addEventListener('pointerdown', (e) => {
+  if (e.target === appearancePanel) closeAppearance();
+});
 showAppearance();
 for (const type of ['pointermove', 'pointerdown', 'focusin', 'wheel']) perch.addEventListener(type, armPerchIdle, { passive: true });
 document.addEventListener('pointerdown', (e) => {
   if (!perch.contains(e.target) && !birdButton.contains(e.target)) closePerch();
-  if (!appearancePanel.contains(e.target) && !appearanceButton.contains(e.target)) closeAppearance();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') {
     closePerch();
     closeAppearance();
+    return;
+  }
+  if (e.key !== 'Tab' || !appearancePanel.classList.contains('open')) return;
+  const focusable = [...appearancePanel.querySelectorAll('button, input')].filter((element) => !element.disabled);
+  const first = focusable[0],
+    lastFocusable = focusable.at(-1);
+  if (e.shiftKey && document.activeElement === first) {
+    e.preventDefault();
+    lastFocusable.focus();
+  } else if (!e.shiftKey && document.activeElement === lastFocusable) {
+    e.preventDefault();
+    first.focus();
   }
 });
 const muteButton = document.getElementById('muteBtn'),
@@ -4018,7 +4049,6 @@ window.addEventListener('resize', () => {
     placePerch();
     markOverflow();
   }
-  if (appearancePanel.classList.contains('open')) placeAppearance();
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setPixelRatio(renderScale());

@@ -332,8 +332,7 @@
       }
       /* The perch: the bird chooser, two strips above the controls line - the
          kinds' shapes over the chosen kind's colors. */
-      #perch,
-      #appearance {
+      #perch {
         position: fixed;
         left: max(1rem, env(safe-area-inset-left));
         bottom: calc(max(0.7rem, env(safe-area-inset-bottom)) + 3.55rem);
@@ -358,8 +357,7 @@
           transform 0.4s ease,
           visibility 0s linear 0.4s;
       }
-      #perch.open,
-      #appearance.open {
+      #perch.open {
         opacity: 1;
         transform: none;
         visibility: visible;
@@ -481,21 +479,125 @@
         margin-right: 0.35rem;
       }
       #appearance {
-        width: min(430px, calc(100% - max(1rem, env(safe-area-inset-left)) - max(1rem, env(safe-area-inset-right))));
-        padding: 0.75rem;
+        position: fixed;
+        inset: 0;
+        z-index: 6;
+        display: grid;
+        place-items: center;
+        box-sizing: border-box;
+        padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+          max(1rem, env(safe-area-inset-bottom)) max(1rem, env(safe-area-inset-left));
+        color: #f6f2ea;
+        background: rgba(5, 12, 18, 0.58);
+        backdrop-filter: blur(8px) saturate(0.92);
+        -webkit-backdrop-filter: blur(8px) saturate(0.92);
+        opacity: 0;
+        visibility: hidden;
+        transition: opacity 0.25s ease, visibility 0s linear 0.25s;
+      }
+      #appearance.open {
+        opacity: 1;
+        visibility: visible;
+        transition: opacity 0.25s ease;
+      }
+      .appearanceModal {
+        width: min(880px, 100%);
+        max-height: min(720px, 100%);
+        overflow: auto;
+        box-sizing: border-box;
+        padding: clamp(1rem, 2.5vw, 1.6rem);
+        border: 1px solid rgba(241, 236, 227, 0.46);
+        border-radius: 26px;
+        background: rgba(14, 26, 34, 0.9);
+        box-shadow: inset 0 1px 0 rgba(248, 242, 230, 0.15), 0 24px 80px rgba(3, 9, 14, 0.5);
+        transform: translateY(12px) scale(0.985);
+        transition: transform 0.25s ease;
+      }
+      #appearance.open .appearanceModal { transform: none; }
+      .appearanceHeader {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-bottom: 1rem;
+      }
+      .appearanceEyebrow,
+      .appearanceTitle,
+      .appearanceSection h3 {
+        margin: 0;
+        font-weight: 400;
+        text-transform: lowercase;
+      }
+      .appearanceEyebrow {
+        margin-bottom: 0.25rem;
+        font-size: 0.57rem;
+        letter-spacing: 0.25em;
+        color: rgba(246, 242, 234, 0.58);
       }
       .appearanceTitle {
-        margin: 0 0 0.55rem 0.15rem;
-        font-size: 0.58rem;
-        font-weight: 400;
+        font-family: Georgia, 'Times New Roman', serif;
+        font-size: clamp(1.35rem, 3vw, 2rem);
+        letter-spacing: 0.03em;
+      }
+      #appearanceClose {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 0.65rem;
+        border: 1px solid rgba(241, 236, 227, 0.34);
+        border-radius: 999px;
+        color: inherit;
+        font: inherit;
+        letter-spacing: 0.08em;
+        background: rgba(241, 236, 227, 0.06);
+        cursor: pointer;
+      }
+      #appearanceClose:hover { background: rgba(241, 236, 227, 0.13); }
+      .appearanceLayout {
+        display: grid;
+        grid-template-columns: minmax(250px, 0.8fr) minmax(360px, 1.2fr);
+        gap: clamp(1rem, 3vw, 2rem);
+      }
+      .appearancePreview {
+        min-height: 360px;
+        display: grid;
+        place-items: center;
+        align-content: center;
+        padding: 1rem;
+        border: 1px solid rgba(241, 236, 227, 0.16);
+        border-radius: 20px;
+        background: radial-gradient(circle at 50% 35%, rgba(116, 158, 173, 0.24), rgba(5, 13, 19, 0.38) 68%);
+      }
+      .appearancePreview svg {
+        width: min(100%, 310px);
+        height: auto;
+        overflow: visible;
+        filter: drop-shadow(0 12px 16px rgba(2, 8, 12, 0.35));
+      }
+      .appearancePreview p {
+        max-width: 26ch;
+        margin: 0.75rem 0 0;
+        text-align: center;
+        font-size: 0.66rem;
+        line-height: 1.55;
+        letter-spacing: 0.09em;
+        color: rgba(246, 242, 234, 0.58);
+      }
+      .appearanceControls { display: grid; align-content: start; gap: 0.9rem; }
+      .appearanceSection {
+        padding-top: 0.75rem;
+        border-top: 1px solid rgba(241, 236, 227, 0.16);
+      }
+      .appearanceSection:first-child { padding-top: 0; border-top: 0; }
+      .appearanceSection h3 {
+        margin-bottom: 0.55rem;
+        font-size: 0.62rem;
         letter-spacing: 0.22em;
-        text-transform: lowercase;
-        color: rgba(246, 242, 234, 0.68);
+        color: rgba(246, 242, 234, 0.66);
       }
       .appearanceGrid {
         display: grid;
-        grid-template-columns: repeat(5, minmax(0, 1fr));
-        gap: 0.55rem 0.45rem;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 0.65rem 0.45rem;
       }
       .appearanceField {
         display: grid;
@@ -521,6 +623,27 @@
         border: 0;
         border-radius: 5px;
       }
+      .skinPresets {
+        grid-column: 2 / -1;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.38rem;
+      }
+      .skinPreset {
+        width: 1.75rem;
+        height: 1.75rem;
+        padding: 3px;
+        border: 1px solid rgba(248, 242, 230, 0.4);
+        border-radius: 50%;
+        background: var(--swatch);
+        box-shadow: inset 0 0 0 3px rgba(8, 18, 26, 0.42);
+        cursor: pointer;
+      }
+      .skinPreset[aria-pressed='true'] {
+        border-color: #fffaf1;
+        box-shadow: inset 0 0 0 3px rgba(8, 18, 26, 0.42), 0 0 0 2px rgba(255, 250, 241, 0.32);
+      }
       :focus-visible {
         outline: 2px solid #f1e5b8;
         outline-offset: 5px;
@@ -535,6 +658,17 @@
         #backendLabel {
           display: none;
         }
+        #appearance { place-items: end center; padding: 0.5rem; }
+        .appearanceModal {
+          max-height: calc(100% - 0.5rem);
+          border-radius: 22px 22px 12px 12px;
+        }
+        .appearanceLayout { grid-template-columns: 1fr; }
+        .appearancePreview {
+          min-height: 190px;
+          grid-template-columns: minmax(150px, 0.8fr) minmax(120px, 1fr);
+        }
+        .appearancePreview svg { max-height: 190px; }
       }
       @media (max-height: 500px) {
         #begin {
@@ -610,20 +744,81 @@
         <div class="perchRail" aria-hidden="true"><div></div></div>
       </div>
     </div>
-    <div id="appearance" inert role="group" aria-label="Customize paraglider appearance">
-      <h2 class="appearanceTitle">paraglider appearance</h2>
-      <div class="appearanceGrid">
-        <label class="appearanceField"><input type="color" data-paraglider-color="canopyPrimary" aria-label="Canopy primary color" /><span>canopy</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="canopySecondary" aria-label="Canopy accent color" /><span>accent</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="canopyPattern" aria-label="Canopy pattern color" /><span>pattern</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="jacket" aria-label="Top color" /><span>top</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="pants" aria-label="Pants color" /><span>pants</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="helmet" aria-label="Headwear color" /><span>headwear</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="harness" aria-label="Harness color" /><span>harness</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="sunglasses" aria-label="Sunglasses color" /><span>glasses</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="gloves" aria-label="Gloves color" /><span>gloves</span></label>
-        <label class="appearanceField"><input type="color" data-paraglider-color="shoes" aria-label="Shoes color" /><span>shoes</span></label>
-      </div>
+    <div id="appearance" inert aria-hidden="true">
+      <section class="appearanceModal" role="dialog" aria-modal="true" aria-labelledby="appearanceTitle">
+        <header class="appearanceHeader">
+          <div>
+            <p class="appearanceEyebrow">paraglider appearance</p>
+            <h2 class="appearanceTitle" id="appearanceTitle">make the flight yours</h2>
+          </div>
+          <button id="appearanceClose" type="button" aria-label="Close appearance customization">close</button>
+        </header>
+        <div class="appearanceLayout">
+          <div class="appearancePreview" aria-label="Preview of the selected pilot and canopy colors">
+            <svg viewBox="0 0 300 360" role="img" aria-label="Stylized paraglider pilot preview">
+              <path d="M22 72 Q150 -8 278 72 Q245 52 150 60 Q55 52 22 72Z" data-preview-color="canopyPrimary" />
+              <path d="M22 72 Q48 48 78 42 L92 58 Q53 58 22 72Z M278 72 Q252 48 222 42 L208 58 Q247 58 278 72Z" data-preview-color="canopySecondary" />
+              <path d="M97 57 L123 29 L150 57 L177 29 L203 57 L184 55 L177 44 L161 59 L139 59 L123 44 L116 55Z" data-preview-color="canopyPattern" />
+              <path d="M55 69 L120 176 M245 69 L180 176 M88 60 L132 176 M212 60 L168 176" fill="none" stroke="rgba(241,236,227,.55)" stroke-width="1.5" />
+              <rect x="138" y="130" width="24" height="28" rx="10" data-preview-color="skin" />
+              <ellipse cx="150" cy="116" rx="29" ry="35" data-preview-color="skin" />
+              <path d="M120 112 Q123 73 150 74 Q179 74 181 113 L174 101 Q148 88 126 102Z" data-preview-color="helmet" />
+              <path d="M122 99 Q150 79 178 99 L180 105 Q150 95 120 108Z" data-preview-color="helmet" />
+              <path d="M124 111 H146 V122 H126Z M154 111 H176 L174 122 H154Z M145 114 H155 V118 H145Z" data-preview-color="sunglasses" />
+              <path d="M112 162 Q150 143 188 162 L198 238 Q150 253 102 238Z" data-preview-color="jacket" />
+              <path d="M114 167 L88 223 Q83 235 96 241 L123 191Z M186 167 L212 223 Q217 235 204 241 L177 191Z" data-preview-color="jacket" />
+              <circle cx="91" cy="240" r="11" data-preview-color="gloves" /><circle cx="209" cy="240" r="11" data-preview-color="gloves" />
+              <path d="M111 166 L127 231 H173 L189 166 L179 158 L164 219 H136 L121 158Z" fill="none" stroke-width="10" data-preview-stroke="harness" />
+              <path d="M111 232 L146 232 L137 305 L107 305Z M154 232 L189 232 L193 305 L163 305Z" data-preview-color="pants" />
+              <path d="M103 298 H138 L143 322 H98 Q91 316 103 298Z M162 298 H197 Q209 316 202 322 H157Z" data-preview-color="shoes" />
+              <path d="M98 321 H143 M157 321 H202" stroke="rgba(9,15,19,.72)" stroke-width="5" stroke-linecap="round" />
+            </svg>
+            <p>Colors update on the flying pilot immediately. The world keeps moving behind this panel.</p>
+          </div>
+          <div class="appearanceControls">
+            <section class="appearanceSection" aria-labelledby="appearanceBody">
+              <h3 id="appearanceBody">body</h3>
+              <div class="appearanceGrid">
+                <label class="appearanceField"><input type="color" data-paraglider-color="skin" aria-label="Body color" /><span>body</span></label>
+                <div class="skinPresets" role="group" aria-label="Body color presets">
+                  <button class="skinPreset" type="button" data-skin-preset="f1c7a5" style="--swatch:#f1c7a5" aria-label="Body color preset light warm"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="b98268" style="--swatch:#b98268" aria-label="Body color preset warm"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="704332" style="--swatch:#704332" aria-label="Body color preset deep warm"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="f2cf3a" style="--swatch:#f2cf3a" aria-label="Body color preset yellow"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="4a91d1" style="--swatch:#4a91d1" aria-label="Body color preset blue"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="55b96a" style="--swatch:#55b96a" aria-label="Body color preset green"></button>
+                  <button class="skinPreset" type="button" data-skin-preset="9a63c7" style="--swatch:#9a63c7" aria-label="Body color preset purple"></button>
+                </div>
+              </div>
+            </section>
+            <section class="appearanceSection" aria-labelledby="appearanceClothing">
+              <h3 id="appearanceClothing">clothing</h3>
+              <div class="appearanceGrid">
+                <label class="appearanceField"><input type="color" data-paraglider-color="jacket" aria-label="Top color" /><span>top</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="pants" aria-label="Pants color" /><span>pants</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="shoes" aria-label="Shoes color" /><span>shoes</span></label>
+              </div>
+            </section>
+            <section class="appearanceSection" aria-labelledby="appearanceAccessories">
+              <h3 id="appearanceAccessories">accessories</h3>
+              <div class="appearanceGrid">
+                <label class="appearanceField"><input type="color" data-paraglider-color="helmet" aria-label="Headwear color" /><span>headwear</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="harness" aria-label="Harness color" /><span>harness</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="sunglasses" aria-label="Sunglasses color" /><span>glasses</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="gloves" aria-label="Gloves color" /><span>gloves</span></label>
+              </div>
+            </section>
+            <section class="appearanceSection" aria-labelledby="appearanceCanopy">
+              <h3 id="appearanceCanopy">canopy</h3>
+              <div class="appearanceGrid">
+                <label class="appearanceField"><input type="color" data-paraglider-color="canopyPrimary" aria-label="Canopy primary color" /><span>canopy</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="canopySecondary" aria-label="Canopy accent color" /><span>accent</span></label>
+                <label class="appearanceField"><input type="color" data-paraglider-color="canopyPattern" aria-label="Canopy pattern color" /><span>pattern</span></label>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
     </div>
     <div id="hud" inert>
       <a id="shareLink" href="#" title="A link to this exact world">share this world</a>

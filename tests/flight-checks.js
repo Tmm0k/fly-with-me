@@ -1266,17 +1266,17 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers', 'shoes'].every((name) => parts[name]),
-      'the player is a paraglider with separately addressable canopy, pilot, harness, lines, risers, arms and shoes',
+        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'risers', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+      'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses and shoes',
     );
     assert(
-      z.appearanceColors.length === 10 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
+      z.appearanceColors.length === 11 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
       'every requested paraglider cosmetic has an independent configured color',
     );
     assert(
       z.appearanceColors.every((name) => colors[name] === z.defaultAppearance.colors[name]) &&
-        colors.jacket < 0x303030 && colors.pants === 0x765238 && colors.shoes === 0xf2f0e8,
-      'the default pilot uses the dark top and headwear, brown pants and white shoes',
+        colors.jacket < 0x303030 && colors.pants === 0x765238 && colors.shoes === 0xf2f0e8 && colors.skin === 0xb98268,
+      'the default pilot uses the dark top and headwear, brown pants, white shoes and a warm body color',
     );
     assert(
       parts.shoes.children.map((child) => child.name).join() === 'shoe-uppers,shoe-soles' &&
@@ -1387,13 +1387,22 @@ async function flightChecks() {
     const perch = doc.getElementById('perch'),
       appearancePanel = doc.getElementById('appearance'),
       appearanceButton = doc.getElementById('appearanceBtn'),
+      appearanceClose = doc.getElementById('appearanceClose'),
       appearanceInputs = [...appearancePanel.querySelectorAll('[data-paraglider-color]')];
     assert(appearancePanel.inert && !appearancePanel.classList.contains('open'), 'the appearance controls are closed and inert until requested');
     appearanceButton.click();
     assert(
-      appearancePanel.classList.contains('open') && !appearancePanel.inert && appearanceInputs.length === z.appearanceColors.length,
-      'the HUD opens one compact color control for every paraglider appearance slot',
+      appearancePanel.classList.contains('open') && !appearancePanel.inert && appearancePanel.getAttribute('aria-hidden') === 'false' &&
+        appearanceInputs.length === z.appearanceColors.length && doc.activeElement === appearanceClose && doc.getElementById('c').inert,
+      'the HUD opens a focus-managed modal with one color control for every paraglider appearance slot',
     );
+    assert(z.running && !z.paused, 'the appearance modal isolates flight input without pausing or resetting the world');
+    appearanceClose.click();
+    assert(appearancePanel.inert && !appearancePanel.classList.contains('open') && doc.activeElement === appearanceButton && !doc.getElementById('c').inert, 'the close control dismisses the modal and restores canvas input and focus');
+    appearanceButton.click();
+    doc.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape' }));
+    assert(appearancePanel.inert && !appearancePanel.classList.contains('open'), 'Escape dismisses the appearance modal');
+    appearanceButton.click();
     const chooseColor = (key, value) => {
       const input = appearanceInputs.find((field) => field.dataset.paragliderColor === key);
       input.value = value;
@@ -1405,13 +1414,24 @@ async function flightChecks() {
     chooseColor('canopyPattern', '#293140');
     chooseColor('jacket', '#315a7d');
     chooseColor('shoes', '#e7d36f');
+    chooseColor('skin', '#f2cf3a');
+    appearancePanel.querySelector('[data-skin-preset="4a91d1"]').click();
     parts = rig.userData.parts;
     const playerChildren = [...rig.children],
       chosenAppearance = { ...z.appearance.colors };
     assert(
-      z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.shoes === 0xe7d36f &&
+      z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.skin === 0x4a91d1 &&
         rig.userData.appearance.colors.jacket === 0x315a7d && rig.userData.animation === animationState,
       'appearance controls recolor the visible rig without replacing its pivot or maneuver state',
+    );
+    const skinColors = parts.skin.geometry.attributes.color.array,
+      skinTriples = new Set();
+    for (let i = 0; i < skinColors.length; i += 3)
+      skinTriples.add(`${skinColors[i].toFixed(6)},${skinColors[i + 1].toFixed(6)},${skinColors[i + 2].toFixed(6)}`);
+    assert(
+      skinTriples.size === 1 &&
+        [...appearancePanel.querySelectorAll('[data-preview-color="skin"]')].every((part) => part.getAttribute('fill') === '#4a91d1'),
+      'arbitrary body colors apply consistently to every exposed pilot surface and the live preview',
     );
     assert(
       z.appearance.colors.canopyPrimary === 0x62d347 && z.appearance.colors.canopySecondary === 0xd8ebf2 &&
@@ -1424,11 +1444,16 @@ async function flightChecks() {
     for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
     assert(parts.canopy.rotation.z > 0.04 && lineError() < 0.001, 'maneuver animation and moving lines continue after an appearance change');
     assert(perch.inert && !perch.classList.contains('open'), 'the perch is closed and out of reach until the control opens it');
+    before.copy(z.objects.bird.position);
     birdButton.click();
     assert(
       perch.classList.contains('open') && !perch.inert && !appearancePanel.classList.contains('open') && appearancePanel.inert,
       'the corner control opens the perch and closes the appearance panel',
     );
+    appearanceButton.click();
+    assert(appearancePanel.classList.contains('open') && perch.inert && !perch.classList.contains('open'), 'opening appearance while the flock panel is open keeps the panels mutually exclusive');
+    appearanceClose.click();
+    birdButton.click();
     const kindTiles = [...perch.querySelectorAll('#perchKinds .tile[data-kind]')],
       colorTiles = () => [...perch.querySelectorAll('#perchPlumages .tile[data-variant]')];
     assert(
@@ -1565,7 +1590,8 @@ async function flightChecks() {
   assert(
     again.z.appearanceColors.every((key) => again.z.appearance.colors[key] === left.appearance[key]) &&
       again.doc.querySelector('[data-paraglider-color="jacket"]').value === '#315a7d' &&
-      again.doc.querySelector('[data-paraglider-color="shoes"]').value === '#e7d36f',
+      again.doc.querySelector('[data-paraglider-color="shoes"]').value === '#e7d36f' &&
+      again.doc.querySelector('[data-paraglider-color="skin"]').value === '#4a91d1',
     'paraglider appearance and its controls are restored on reload',
   );
   assert(!again.z.running && again.z.audioState === 'not-created', 'a remembered flight still waits for Begin');
@@ -1603,6 +1629,7 @@ async function flightChecks() {
   const damagedSettings = JSON.parse(localStorage.getItem('fly-with-me-settings'));
   damagedSettings.paraglider.colors.jacket = 'not-a-color';
   damagedSettings.paraglider.colors.shoes = 0x1000000;
+  damagedSettings.paraglider.colors.skin = -1;
   localStorage.setItem('fly-with-me-settings', JSON.stringify(damagedSettings));
   const sanitizedUrl = new URL(location.href);
   sanitizedUrl.searchParams.set('seed', String((left.seed + 2) >>> 0));
@@ -1610,6 +1637,7 @@ async function flightChecks() {
   assert(
     sanitized.z.appearance.colors.jacket === sanitized.z.defaultAppearance.colors.jacket &&
       sanitized.z.appearance.colors.shoes === sanitized.z.defaultAppearance.colors.shoes &&
+      sanitized.z.appearance.colors.skin === sanitized.z.defaultAppearance.colors.skin &&
       sanitized.z.appearance.colors.pants === left.appearance.pants,
     'invalid stored appearance colors fall back independently without discarding valid choices',
   );
