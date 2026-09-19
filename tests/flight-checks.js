@@ -66,8 +66,9 @@ async function flightChecks() {
   );
   assert(
     !doc.getElementById('birdBtn') && !doc.getElementById('perch') &&
-      !('companions' in z.objects) && !('moments' in z) && !('setBird' in z) && !('setPlumage' in z),
-    'companion meshes, scheduling APIs and flock controls are absent',
+      !('companions' in z.objects) && !('moments' in z) && !('setBird' in z) && !('setPlumage' in z) &&
+      !('flapping' in z.state) && !('flapTimer' in z.state) && !('flapBurst' in z.state),
+    'companion meshes, scheduling APIs, flock controls and obsolete player flapping state are absent',
   );
   assert(!z.resumed && z.volume === 0.5, 'a fresh visit starts at half volume');
   assert(

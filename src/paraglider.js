@@ -463,7 +463,9 @@ export function animateParaglider(rig, dt, motion = {}) {
   parts.torso.position.set(torsoShift, -intensity * 0.012, 0);
   parts.torso.rotation.set(pilotPitch * 0.16, 0, torsoLean);
   parts.head.rotation.z = headLean;
-  for (const part of [parts.harness, parts.pants, parts.shoes]) part.position.x = hipShift;
+  parts.harness.position.x = hipShift;
+  parts.pants.position.x = hipShift;
+  parts.shoes.position.x = hipShift;
   parts.harness.rotation.z = legLean * 0.35;
   parts.pants.rotation.z = legLean;
   parts.shoes.rotation.z = legLean;

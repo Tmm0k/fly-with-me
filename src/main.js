@@ -2517,9 +2517,6 @@ const state = {
   aim: 0, // climb angle the captain steered to, radians
   aimHold: 0, // how much of the vertical is his, 1 while he steers
   t: 0,
-  flapping: false,
-  flapTimer: 0,
-  flapBurst: 0,
   dragging: false,
   dragButton: -1, // 0 orbits the camera, 2 steers the bird
   lastPX: 0,
@@ -2795,20 +2792,6 @@ function updateFlight(dt) {
   state.bank += (bankTarget - state.bank) * Math.min(1, dt * 2.2);
   const pitchTarget = Math.atan2(state.vy, SPEED) * 1.6;
   state.pitch += (pitchTarget - state.pitch) * Math.min(1, dt * 2.0);
-  // flap bursts: when climbing, and now and then while gliding
-  state.flapTimer -= dt;
-  if (state.flapBurst > 0) {
-    state.flapBurst -= dt;
-    state.flapping = true;
-  } else if (state.vy > 2.5) {
-    state.flapping = true;
-  } else {
-    state.flapping = false;
-    if (state.flapTimer <= 0) {
-      state.flapBurst = 2.2 + Math.random() * 2;
-      state.flapTimer = 7 + Math.random() * 9;
-    }
-  }
   // nudge decay
   if (!state.dragging) {
     state.nudgeYaw *= Math.exp(-dt / 2.4);
@@ -2984,8 +2967,8 @@ function updateCamera(dt) {
 }
 
 // ---------------------------------------------------------------------------
-// Sound: everything synthesized. Wind that follows altitude and speed, water
-// near the ocean, a pentatonic chime now and then, a soft brush per wing beat.
+// Sound: everything synthesized. Wind follows altitude and speed, water rises
+// near the ocean, and a pentatonic chime sounds now and then.
 // ---------------------------------------------------------------------------
 const audio = (() => {
   let ctx = null,
@@ -2998,8 +2981,7 @@ const audio = (() => {
     muted = storedSettings.muted === true,
     volume = finite(storedSettings.volume, 0, 1) ?? 0.5,
     started = false;
-  let lastFlapPhase = 0,
-    chimeTimer = 25;
+  let chimeTimer = 25;
   const PENTA = [261.63, 293.66, 329.63, 392.0, 440.0, 523.25, 587.33, 659.25, 783.99];
   function pinkBuffer(seconds) {
     const sr = ctx.sampleRate,
@@ -3114,28 +3096,6 @@ const audio = (() => {
       };
     }
   }
-  function flap() {
-    if (!ctx) return;
-    const t = ctx.currentTime;
-    const src = ctx.createBufferSource();
-    src.buffer = noise;
-    const bp = ctx.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 260;
-    bp.Q.value = 1.1;
-    const g = ctx.createGain();
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.11, t + 0.05);
-    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.19);
-    src.connect(bp).connect(g).connect(master);
-    src.start(t, Math.random() * 3);
-    src.stop(t + 0.25);
-    src.onended = () => {
-      src.disconnect();
-      bp.disconnect();
-      g.disconnect();
-    };
-  }
   function update(dt) {
     if (!ctx) return;
     const alt = Math.max(0, state.y - heightAt(state.x, state.z));
@@ -3156,10 +3116,6 @@ const audio = (() => {
     const near = heightAt(state.x, state.z) < 0 ? 1 : 0;
     const water = Math.min(1, (under / 8) * 0.8 + near * 0.4) * Math.max(0, 1 - alt / 500);
     waterGain.gain.setTargetAtTime(water * 0.28, ctx.currentTime, 1.2);
-    // wing beats
-    const ph = bird.userData.phase % 6.283;
-    if (state.flapping && ph < lastFlapPhase) flap();
-    lastFlapPhase = ph;
     chimeTimer -= dt;
     if (chimeTimer <= 0) {
       chime(1 + (Math.random() < 0.3 ? 1 : 0));
@@ -3195,7 +3151,6 @@ const audio = (() => {
   return {
     start,
     chime,
-    flap,
     update,
     toggleMute,
     setVolume,
