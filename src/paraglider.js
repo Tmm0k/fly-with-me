@@ -523,6 +523,10 @@ export function createParaglider(appearance, kit) {
   torso.rotation.order = 'YXZ';
   pilot.add(torso);
 
+  const shoulders = new THREE.Group();
+  shoulders.name = 'shoulders';
+  torso.add(shoulders);
+
   const harness = new THREE.Group();
   harness.name = 'harness';
   const harnessBack = profiledGeometry(
@@ -531,15 +535,16 @@ export function createParaglider(appearance, kit) {
       { y: -0.02, z: -0.44, rx: 0.2, rz: 0.08 },
       { y: 0.14, z: -0.5, rx: 0.28, rz: 0.12 },
       { y: 0.4, z: -0.52, rx: 0.3, rz: 0.145 },
-      { y: 0.62, z: -0.48, rx: 0.24, rz: 0.115 },
-      { y: 0.73, z: -0.41, rx: 0.13, rz: 0.065 },
+      { y: 0.62, z: -0.48, rx: 0.27, rz: 0.125 },
+      { y: 0.75, z: -0.42, rx: 0.2, rz: 0.095 },
+      { y: 0.81, z: -0.37, rx: 0.11, rz: 0.06 },
     ],
     12,
   );
   const harnessStraps = [];
   for (const side of [-1, 1]) {
     harnessStraps.push(
-      { ...strut(THREE, [side * 0.27, 0.67, -0.38], [side * 0.2, 0.08, -0.44], 0.035, 7), color: colors.harness },
+      { ...strut(THREE, [side * 0.32, 0.77, -0.32], [side * 0.2, 0.08, -0.44], 0.035, 7), color: colors.harness },
       { ...strut(THREE, [side * 0.21, 0.02, -0.31], [side * 0.27, -0.31, -0.12], 0.032, 7), color: colors.harness },
       { ...strut(THREE, [side * 0.27, -0.31, -0.12], [side * 0.24, -0.49, 0.34], 0.026, 7), color: colors.harness },
     );
@@ -598,9 +603,11 @@ export function createParaglider(appearance, kit) {
           { y: -0.02, z: -0.08, rx: 0.22, rz: 0.145 },
           { y: 0.12, z: -0.105, rx: 0.27, rz: 0.175 },
           { y: 0.42, z: -0.18, rx: 0.32, rz: 0.2 },
-          { y: 0.66, z: -0.245, rx: 0.39, rz: 0.205 },
-          { y: 0.77, z: -0.285, rx: 0.31, rz: 0.17 },
-          { y: 0.84, z: -0.31, rx: 0.16, rz: 0.115 },
+          { y: 0.61, z: -0.235, rx: 0.36, rz: 0.205 },
+          { y: 0.7, z: -0.275, rx: 0.41, rz: 0.205 },
+          { y: 0.78, z: -0.305, rx: 0.34, rz: 0.18 },
+          { y: 0.85, z: -0.33, rx: 0.24, rz: 0.145 },
+          { y: 0.89, z: -0.35, rx: 0.17, rz: 0.12 },
         ], 14),
         color: colors.jacket,
       },
@@ -613,29 +620,45 @@ export function createParaglider(appearance, kit) {
     material,
     'jacket',
   );
-  torso.add(jacket);
+  shoulders.add(jacket);
+
+  const neck = mesh(
+    THREE,
+    merge([{
+      geometry: profiledGeometry(THREE, [
+        { y: 0.84, z: -0.39, rx: 0.16, rz: 0.13 },
+        { y: 0.92, z: -0.39, rx: 0.15, rz: 0.13 },
+        { y: 1.03, z: -0.37, rx: 0.125, rz: 0.12 },
+        { y: 1.08, z: -0.35, rx: 0.15, rz: 0.14 },
+      ], 12),
+      color: colors.skin,
+    }]),
+    material,
+    'neck',
+  );
+  shoulders.add(neck);
 
   const head = new THREE.Group();
   head.name = 'head';
-  head.position.set(0, 1.3, -0.38);
+  head.position.set(0, 1.24, -0.38);
   const skin = mesh(
     THREE,
     merge([
       {
         geometry: profiledGeometry(THREE, [
-          { y: -0.24, z: 0.035, rx: 0.13, rz: 0.15 },
-          { y: -0.19, z: 0.025, rx: 0.19, rz: 0.205 },
-          { y: -0.05, z: 0.015, rx: 0.245, rz: 0.255 },
-          { y: 0.1, z: -0.005, rx: 0.255, rz: 0.265 },
-          { y: 0.22, z: -0.025, rx: 0.205, rz: 0.22 },
-          { y: 0.26, z: -0.035, rx: 0.12, rz: 0.14 },
+          { y: -0.22, z: 0.035, rx: 0.13, rz: 0.13 },
+          { y: -0.17, z: 0.04, rx: 0.18, rz: 0.18 },
+          { y: -0.09, z: 0.03, rx: 0.235, rz: 0.235 },
+          { y: 0.03, z: 0.015, rx: 0.255, rz: 0.265 },
+          { y: 0.15, z: -0.01, rx: 0.24, rz: 0.25 },
+          { y: 0.24, z: -0.04, rx: 0.18, rz: 0.19 },
+          { y: 0.28, z: -0.055, rx: 0.1, rz: 0.12 },
         ], 14),
         color: colors.skin,
       },
-      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(-0.25, -0.035, 0, 0.043, 0.078, 0.052), color: colors.skin },
-      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(0.25, -0.035, 0, 0.043, 0.078, 0.052), color: colors.skin },
-      { geometry: new THREE.SphereGeometry(1, 8, 5), matrix: M(0, -0.065, 0.255, 0.042, 0.058, 0.055), color: colors.skin },
-      { geometry: new THREE.CylinderGeometry(0.115, 0.14, 0.17, 12), matrix: M(0, -0.325, -0.02), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(-0.25, 0.005, -0.005, 0.043, 0.075, 0.05), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 9, 6), matrix: M(0.25, 0.005, -0.005, 0.043, 0.075, 0.05), color: colors.skin },
+      { geometry: new THREE.SphereGeometry(1, 8, 5), matrix: M(0, -0.08, 0.255, 0.04, 0.052, 0.05), color: colors.skin },
     ]),
     material,
     'skin',
@@ -663,13 +686,13 @@ export function createParaglider(appearance, kit) {
     'sunglasses',
   );
   head.add(skin, headwear, sunglasses);
-  torso.add(head);
+  shoulders.add(head);
 
   const left = limb(THREE, material, merge, colors.jacket, colors.gloves, -1);
   const right = limb(THREE, material, merge, colors.jacket, colors.gloves, 1);
   left.arm.userData.restPosition = left.arm.position.clone();
   right.arm.userData.restPosition = right.arm.position.clone();
-  torso.add(left.arm, right.arm);
+  shoulders.add(left.arm, right.arm);
 
   const pants = new THREE.Group();
   pants.name = 'pants';
@@ -794,6 +817,7 @@ export function createParaglider(appearance, kit) {
     canopy,
     pilot,
     torso,
+    shoulders,
     harness,
     harnessBackpack,
     glowStickMount,
@@ -807,6 +831,7 @@ export function createParaglider(appearance, kit) {
     rightForearm: right.forearm,
     risers,
     head,
+    neck,
     skin,
     headwear,
     sunglasses,

@@ -1244,8 +1244,19 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'torso', 'harness', 'harnessBackpack', 'glowStick', 'glowStickMount', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+        ['canopy', 'pilot', 'torso', 'shoulders', 'head', 'neck', 'harness', 'harnessBackpack', 'glowStick', 'glowStickMount', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
       'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses, gloves and shoes',
+    );
+    assert(
+      parts.shoulders.parent === parts.torso && parts.head.parent === parts.shoulders && parts.neck.parent === parts.shoulders &&
+        parts.jacket.parent === parts.shoulders && parts.leftArm.parent === parts.shoulders && parts.rightArm.parent === parts.shoulders,
+      'the head and tapered neck seat into the shirt shoulders without changing the animated arm pivots',
+    );
+    for (const part of [parts.skin, parts.neck, parts.jacket]) part.geometry.computeBoundingBox();
+    assert(
+      parts.neck.geometry.boundingBox.max.y > parts.head.position.y + parts.skin.geometry.boundingBox.min.y &&
+        parts.neck.geometry.boundingBox.min.y < parts.jacket.geometry.boundingBox.max.y,
+      'the tapered neck overlaps both the jaw and shirt collar instead of leaving a detached gap',
     );
     assert(
       z.appearanceColors.length === 12 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
@@ -1271,7 +1282,7 @@ async function flightChecks() {
       glowBox = parts.glowStick.geometry.boundingBox;
     assert(
       parts.harnessBackpack.parent === parts.harness && parts.glowStickMount.parent === parts.harness &&
-        parts.glowStick.parent === parts.harness && backpackBox.min.z < -0.64 && backpackBox.max.y < 0.75 &&
+        parts.glowStick.parent === parts.harness && backpackBox.min.z < -0.64 && backpackBox.max.y < 0.85 &&
         glowBox.max.y - glowBox.min.y > (glowBox.max.x - glowBox.min.x) * 3 &&
         Math.abs(glowBox.max.x + glowBox.min.x) < 0.000001,
       'a compact rounded backpack and centered vertical glow stick are attached to the animated harness',
@@ -1513,13 +1524,15 @@ async function flightChecks() {
     z.dayPhase = savedGlowPhase;
     z.step(0.001);
     const skinColors = parts.skin.geometry.attributes.color.array,
+      neckColors = parts.neck.geometry.attributes.color.array,
       skinTriples = new Set();
     for (let i = 0; i < skinColors.length; i += 3)
       skinTriples.add(`${skinColors[i].toFixed(6)},${skinColors[i + 1].toFixed(6)},${skinColors[i + 2].toFixed(6)}`);
     assert(
       skinTriples.size === 1 &&
+        neckColors.every((value, index) => Math.abs(value - skinColors[index % 3]) < 0.000001) &&
         [...appearancePanel.querySelectorAll('[data-preview-color="skin"]')].every((part) => part.getAttribute('fill') === '#4a91d1'),
-      'arbitrary body colors apply consistently to every exposed pilot surface and the live preview',
+      'arbitrary body colors apply consistently to the face, neck and live preview',
     );
     assert(
       z.appearance.colors.canopyPrimary === 0x62d347 && z.appearance.colors.canopySecondary === 0xd8ebf2 &&
