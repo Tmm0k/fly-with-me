@@ -435,23 +435,47 @@ export function animateParaglider(rig, dt, motion = {}) {
   const pitch = Math.max(-1, Math.min(1, vertical * 0.75 + aimed * 0.25));
   const time = Number.isFinite(motion.time) ? motion.time : 0;
   const air = Math.sin(time * 0.83) * 0.004 + Math.sin(time * 1.37 + 0.8) * 0.002;
+  const intensity = Math.abs(turn);
+  const control = turn * (0.35 + intensity * 0.65);
+  const leftInput = Math.max(0, control);
+  const rightInput = Math.max(0, -control);
 
   const canopyBank = spring(state, 'canopyBank', -turn * 0.14 + air, dt, 8);
-  const pilotBank = spring(state, 'pilotBank', -turn * 0.22 + air * 0.7, dt, 4.2);
-  const pilotShift = spring(state, 'pilotShift', -turn * 0.1, dt, 3.8);
+  const pilotBank = spring(state, 'pilotBank', -control * 0.14 + air * 0.7, dt, 4.2);
+  const pilotShift = spring(state, 'pilotShift', -control * 0.035, dt, 3.8);
   const canopyPitch = spring(state, 'canopyPitch', -pitch * 0.035, dt, 6);
   const pilotPitch = spring(state, 'pilotPitch', pitch * 0.07, dt, 3.8);
-  const leftBrake = spring(state, 'leftBrake', Math.max(0, turn) * 0.42 - Math.max(0, -turn) * 0.04, dt, 7);
-  const rightBrake = spring(state, 'rightBrake', Math.max(0, -turn) * 0.42 - Math.max(0, turn) * 0.04, dt, 7);
+  const leftBrake = spring(state, 'leftBrake', leftInput * 0.72 - rightInput * 0.035, dt, 8.5);
+  const rightBrake = spring(state, 'rightBrake', rightInput * 0.72 - leftInput * 0.035, dt, 8.5);
+  const leftShoulder = spring(state, 'leftShoulder', leftInput, dt, 7.2);
+  const rightShoulder = spring(state, 'rightShoulder', rightInput, dt, 7.2);
+  const torsoShift = spring(state, 'torsoShift', -control * 0.075, dt, 4.2);
+  const torsoLean = spring(state, 'torsoLean', -control * 0.09, dt, 4);
+  const hipShift = spring(state, 'hipShift', -control * 0.05, dt, 3.4);
+  const legLean = spring(state, 'legLean', -control * 0.026, dt, 2.6);
+  const headLean = spring(state, 'headLean', control * 0.018, dt, 3.2);
 
   parts.canopy.rotation.set(canopyPitch, 0, canopyBank);
   parts.pilot.rotation.set(pilotPitch, 0, pilotBank);
   parts.pilot.position.set(pilotShift, Math.sin(time * 0.72 + 0.4) * 0.012, -pitch * 0.035);
-  parts.harness.rotation.z = pilotBank * 0.12;
-  parts.leftArm.rotation.x = leftBrake * 0.48;
-  parts.rightArm.rotation.x = rightBrake * 0.48;
-  parts.leftForearm.rotation.x = leftBrake;
-  parts.rightForearm.rotation.x = rightBrake;
+  parts.torso.position.set(torsoShift, -intensity * 0.012, 0);
+  parts.torso.rotation.set(pilotPitch * 0.16, 0, torsoLean);
+  parts.head.rotation.z = headLean;
+  for (const part of [parts.harness, parts.pants, parts.shoes]) part.position.x = hipShift;
+  parts.harness.rotation.z = legLean * 0.35;
+  parts.pants.rotation.z = legLean;
+  parts.shoes.rotation.z = legLean;
+
+  parts.leftArm.position.copy(parts.leftArm.userData.restPosition);
+  parts.leftArm.position.y -= leftShoulder * 0.075;
+  parts.leftArm.position.z -= leftShoulder * 0.025;
+  parts.rightArm.position.copy(parts.rightArm.userData.restPosition);
+  parts.rightArm.position.y -= rightShoulder * 0.075;
+  parts.rightArm.position.z -= rightShoulder * 0.025;
+  parts.leftArm.rotation.set(leftBrake * 0.3, 0, leftInput * 0.035);
+  parts.rightArm.rotation.set(rightBrake * 0.3, 0, -rightInput * 0.035);
+  parts.leftForearm.rotation.set(leftBrake * 1.08, -leftBrake * 0.07, 0);
+  parts.rightForearm.rotation.set(rightBrake * 1.08, rightBrake * 0.07, 0);
   updateParagliderLines(rig);
 }
 
@@ -481,6 +505,11 @@ export function createParaglider(appearance, kit) {
   pilot.name = 'pilot';
   pilot.rotation.order = 'YXZ';
   rig.add(pilot);
+
+  const torso = new THREE.Group();
+  torso.name = 'torso';
+  torso.rotation.order = 'YXZ';
+  pilot.add(torso);
 
   const harness = new THREE.Group();
   harness.name = 'harness';
@@ -547,7 +576,7 @@ export function createParaglider(appearance, kit) {
     material,
     'jacket',
   );
-  pilot.add(jacket);
+  torso.add(jacket);
 
   const head = new THREE.Group();
   head.name = 'head';
@@ -597,11 +626,13 @@ export function createParaglider(appearance, kit) {
     'sunglasses',
   );
   head.add(skin, headwear, sunglasses);
-  pilot.add(head);
+  torso.add(head);
 
   const left = limb(THREE, material, merge, colors.jacket, colors.gloves, -1);
   const right = limb(THREE, material, merge, colors.jacket, colors.gloves, 1);
-  pilot.add(left.arm, right.arm);
+  left.arm.userData.restPosition = left.arm.position.clone();
+  right.arm.userData.restPosition = right.arm.position.clone();
+  torso.add(left.arm, right.arm);
 
   const pants = new THREE.Group();
   pants.name = 'pants';
@@ -725,6 +756,7 @@ export function createParaglider(appearance, kit) {
   rig.userData.parts = {
     canopy,
     pilot,
+    torso,
     harness,
     lines,
     leftArm: left.arm,
@@ -763,6 +795,20 @@ export function createParaglider(appearance, kit) {
     leftBrakeVelocity: 0,
     rightBrake: 0,
     rightBrakeVelocity: 0,
+    leftShoulder: 0,
+    leftShoulderVelocity: 0,
+    rightShoulder: 0,
+    rightShoulderVelocity: 0,
+    torsoShift: 0,
+    torsoShiftVelocity: 0,
+    torsoLean: 0,
+    torsoLeanVelocity: 0,
+    hipShift: 0,
+    hipShiftVelocity: 0,
+    legLean: 0,
+    legLeanVelocity: 0,
+    headLean: 0,
+    headLeanVelocity: 0,
   };
   rig.userData.lineScratch = {
     from: new THREE.Vector3(),
@@ -785,7 +831,7 @@ export function dressParaglider(rig, appearance, kit) {
   const oldParts = rig.userData.parts;
   const animation = rig.userData.animation;
   const pose = {};
-  for (const name of ['canopy', 'pilot', 'harness', 'leftArm', 'rightArm', 'leftForearm', 'rightForearm']) {
+  for (const name of ['canopy', 'pilot', 'torso', 'harness', 'pants', 'shoes', 'head', 'leftArm', 'rightArm', 'leftForearm', 'rightForearm']) {
     const part = oldParts?.[name];
     if (part) pose[name] = {
       position: part.position.clone(),

@@ -1243,7 +1243,7 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+        ['canopy', 'pilot', 'torso', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
       'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses, gloves and shoes',
     );
     assert(
@@ -1333,12 +1333,16 @@ async function flightChecks() {
     const brakeRecords = canopyBrakeRecords;
     const handHeight = (record) => parts.pilot.worldToLocal(record.from.getWorldPosition(new V3())).y;
     for (let i = 0; i < 120; i++) z.animateParaglider(0.05, { time: i * 0.05 });
-    z.animateParaglider(0.05, { turnRate: 0.55, time: 6 });
+    const neutralHandHeight = handHeight(brakeRecords[0]);
+    for (let i = 0; i < 50; i++) z.animateParaglider(0.05, { turnRate: 0.22, time: 6 + i * 0.05 });
+    const gentleLeftDrop = neutralHandHeight - handHeight(brakeRecords[0]);
+    for (let i = 0; i < 120; i++) z.animateParaglider(0.05, { time: 8.5 + i * 0.05 });
+    z.animateParaglider(0.05, { turnRate: 0.55, time: 14.5 });
     assert(
       Math.abs(parts.canopy.rotation.z) > Math.abs(parts.pilot.rotation.z) * 1.5,
       'the canopy leads a turn before the suspended pilot follows',
     );
-    for (let i = 1; i < 50; i++) z.animateParaglider(0.05, { turnRate: 0.55, time: 6 + i * 0.05 });
+    for (let i = 1; i < 50; i++) z.animateParaglider(0.05, { turnRate: 0.55, time: 14.5 + i * 0.05 });
     const leftPose = {
       canopy: parts.canopy.rotation.z,
       pilot: parts.pilot.rotation.z,
@@ -1346,29 +1350,54 @@ async function flightChecks() {
       rightBrake: parts.rightForearm.rotation.x,
       leftHand: handHeight(brakeRecords[0]),
       rightHand: handHeight(brakeRecords[1]),
+      torsoShift: parts.torso.position.x,
+      torsoLean: parts.torso.rotation.z,
+      hipShift: parts.pants.position.x,
+      legLean: parts.pants.rotation.z,
     };
     assert(
       leftPose.canopy < -0.08 && leftPose.pilot < -0.12 && leftPose.leftBrake > leftPose.rightBrake + 0.25 && leftPose.leftHand < leftPose.rightHand,
       'a left turn banks canopy and pilot left while lowering the left brake hand',
     );
+    assert(
+      neutralHandHeight - leftPose.leftHand > gentleLeftDrop + 0.08 &&
+        parts.leftArm.position.y < parts.rightArm.position.y - 0.04,
+      'strong brake input lowers the inside shoulder, elbow and hand farther than gentle input',
+    );
+    assert(
+      leftPose.torsoShift < -0.04 && leftPose.torsoLean < -0.05 && leftPose.hipShift < -0.025 &&
+        Math.abs(leftPose.hipShift) < Math.abs(leftPose.torsoShift) && Math.abs(leftPose.legLean) < Math.abs(leftPose.torsoLean),
+      'the torso and seated hips shift into a left turn while the lower body follows with less motion',
+    );
     assert(lineError() < 0.001, 'suspension and brake lines remain joined during a left turn');
-    for (let i = 0; i < 70; i++) z.animateParaglider(0.05, { turnRate: -0.55, time: 9 + i * 0.05 });
+    for (let i = 0; i < 70; i++) z.animateParaglider(0.05, { turnRate: -0.55, time: 17 + i * 0.05 });
     assert(
       parts.canopy.rotation.z > 0.08 &&
         parts.pilot.rotation.z > 0.12 &&
         parts.rightForearm.rotation.x > parts.leftForearm.rotation.x + 0.25 &&
-        handHeight(brakeRecords[1]) < handHeight(brakeRecords[0]),
+        handHeight(brakeRecords[1]) < handHeight(brakeRecords[0]) &&
+        parts.torso.position.x > 0.04 && parts.pants.position.x > 0.025 &&
+        parts.rightArm.position.y < parts.leftArm.position.y - 0.04,
       'a right turn mirrors the bank, lean and brake-hand motion',
     );
     assert(lineError() < 0.001, 'suspension and brake lines remain joined during a right turn');
-    z.animateParaglider(0.05, { verticalRate: 11, aim: 0.3, time: 13 });
+    assert(
+      [parts.canopy, parts.pilot, parts.torso, parts.harness, parts.pants, parts.shoes, parts.leftArm, parts.rightArm].every((part) =>
+        [...part.position.toArray(), ...part.quaternion.toArray(), ...part.scale.toArray()].every(Number.isFinite)),
+      'layered maneuver animation keeps every pilot control transform finite',
+    );
+    z.animateParaglider(0.05, { verticalRate: 11, aim: 0.3, time: 20.5 });
     assert(parts.canopy.rotation.x !== 0 && parts.pilot.rotation.x !== 0, 'climb intent gives the canopy and suspended pilot a subtle relative pitch response');
-    for (let i = 0; i < 160; i++) z.animateParaglider(0.05, { time: 14 + i * 0.05 });
+    for (let i = 0; i < 160; i++) z.animateParaglider(0.05, { time: 20.55 + i * 0.05 });
     assert(
       Math.abs(parts.canopy.rotation.z) < 0.015 &&
         Math.abs(parts.pilot.rotation.z) < 0.015 &&
         Math.abs(parts.leftForearm.rotation.x) < 0.015 &&
-        Math.abs(parts.rightForearm.rotation.x) < 0.015,
+        Math.abs(parts.rightForearm.rotation.x) < 0.015 &&
+        Math.abs(parts.torso.position.x) < 0.015 &&
+        Math.abs(parts.torso.rotation.z) < 0.015 &&
+        Math.abs(parts.pants.position.x) < 0.015 &&
+        Math.abs(parts.pants.rotation.z) < 0.015,
       'released steering settles smoothly back toward neutral',
     );
     assert(lineError() < 0.001, 'dynamic lines remain attached after the rig settles');
