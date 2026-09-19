@@ -1279,14 +1279,21 @@ async function flightChecks() {
     z.dayPhase = 0.5;
     z.step(0.001);
     const dayGlow = parts.glowIntensity.value;
-    z.dayPhase = event('sun', false).phase + 0.08;
-    z.step(0.001);
-    const nightGlow = parts.glowIntensity.value;
+    const glowTransition = [];
+    for (let i = 0; i <= 40; i++) {
+      z.dayPhase = event('sun', false).phase + i * 0.003;
+      z.step(0.000001);
+      glowTransition.push(parts.glowIntensity.value);
+    }
+    const nightGlow = Math.max(...glowTransition);
     z.dayPhase = savedGlowPhase;
     z.step(0.001);
     assert(
-      Number.isFinite(dayGlow) && Number.isFinite(nightGlow) && dayGlow > 0 && nightGlow > dayGlow * 8,
-      'night state raises the glow-stick emissive intensity well above its subtle daylight level',
+      dayGlow === 0 && glowTransition.every((value) => Number.isFinite(value) && value >= 0 && value <= 5) &&
+        glowTransition.some((value) => value > 0 && value < 5) &&
+        glowTransition.every((value, index) => index === 0 || value >= glowTransition[index - 1] - 0.000001) &&
+        nightGlow > 4.9,
+      'the glow stick has zero daytime emission and follows a finite, bounded darkness ramp into night',
     );
     const pilotMeshes = [];
     parts.pilot.traverse((part) => {
@@ -1450,7 +1457,8 @@ async function flightChecks() {
       input.value = value;
       input.dispatchEvent(new win.Event('input', { bubbles: true }));
     };
-    const originalCanopyGeometry = parts.canopySurface.geometry;
+    const originalCanopyGeometry = parts.canopySurface.geometry,
+      originalGlowMaterial = parts.glowStick.material;
     chooseColor('canopyPrimary', '#62d347');
     chooseColor('canopySecondary', '#d8ebf2');
     chooseColor('canopyPattern', '#293140');
@@ -1470,8 +1478,14 @@ async function flightChecks() {
     );
     assert(
       appearancePanel.querySelector('[data-paraglider-color="glowStick"]').value === '#ff4bd8' &&
-        appearancePanel.querySelector('[data-preview-color="glowStick"]').getAttribute('fill') === '#ff4bd8',
-      'the accessories control accepts an arbitrary glow-stick RGB color and updates its preview',
+        appearancePanel.querySelector('[data-preview-color="glowStick"]').getAttribute('fill') === '#ff4bd8' &&
+        parts.glowStick.material === originalGlowMaterial && parts.glowStick.material.emissiveNode,
+      'the accessories control accepts an arbitrary glow-stick RGB color without rebuilding its emissive material',
+    );
+    const glowColors = parts.glowStick.geometry.attributes.color.array;
+    assert(
+      glowColors[0] > 0.99 && glowColors[1] < 0.15 && glowColors[2] > 0.6,
+      'the selected user color supplies the glow stick material at day and through its night emission',
     );
     const skinColors = parts.skin.geometry.attributes.color.array,
       skinTriples = new Set();

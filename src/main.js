@@ -610,7 +610,7 @@ const uMoonDir = uniform(new THREE.Vector3(0, 1, 0));
 const uMoonUp = uniform(0); // the moon is above the horizon
 const uMoonLight = uniform(0); // moonlight strength: night, moon up
 const uNight = uniform(0);
-const uGlowStickIntensity = uniform(0.25);
+const uGlowStickIntensity = uniform(0);
 const uLowSun = uniform(0); // the sun sits on the horizon
 const uGlow = uniform(C(0)); // the sun-side horizon band
 const uGlowI = uniform(0);
@@ -3398,7 +3398,10 @@ function updateAtmosphere(dt) {
   const moonAbove = sstep(-0.02, 0.12, _moonDir.y);
   const moonLight = sstep(-0.09, -0.2, sy) * moonAbove;
   uNight.value = night;
-  uGlowStickIntensity.value = 0.25 + night * 4.75;
+  // The stick is ordinary colored plastic until the sun is below the night
+  // ramp. Its emissive response then follows the same smooth darkness factor
+  // as the sky, clouds and fog instead of a separate clock.
+  uGlowStickIntensity.value = night * 5;
   uSunDir.value.copy(_sunDir);
   uMoonDir.value.copy(_moonDir);
   uMoonUp.value = moonAbove;
