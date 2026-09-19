@@ -483,7 +483,15 @@ export function animateParaglider(rig, dt, motion = {}) {
 
 /** Build the visible player rig around the engine-owned flight pivot. */
 export function createParaglider(appearance, kit) {
-  const { THREE, merge, M, material, glowMaterial = material, glowIntensity = null } = kit;
+  const {
+    THREE,
+    merge,
+    M,
+    material,
+    glowMaterial = material,
+    glowIntensity = null,
+    glowBaseStrength = null,
+  } = kit;
   const config = normalizeParagliderAppearance(appearance);
   const colors = config.colors;
   const rig = new THREE.Group();
@@ -789,6 +797,7 @@ export function createParaglider(appearance, kit) {
     glowStickMount,
     glowStick,
     glowIntensity,
+    glowBaseStrength,
     lines,
     leftArm: left.arm,
     rightArm: right.arm,

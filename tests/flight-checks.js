@@ -1278,22 +1278,29 @@ async function flightChecks() {
     const savedGlowPhase = z.dayPhase;
     z.dayPhase = 0.5;
     z.step(0.001);
-    const dayGlow = parts.glowIntensity.value;
+    const dayGlow = parts.glowIntensity.value,
+      dayGlowBase = parts.glowBaseStrength.value;
     const glowTransition = [];
+    const glowBaseTransition = [];
     for (let i = 0; i <= 40; i++) {
       z.dayPhase = event('sun', false).phase + i * 0.003;
       z.step(0.000001);
       glowTransition.push(parts.glowIntensity.value);
+      glowBaseTransition.push(parts.glowBaseStrength.value);
     }
-    const nightGlow = Math.max(...glowTransition);
+    const nightGlow = Math.max(...glowTransition),
+      nightGlowBase = Math.max(...glowBaseTransition);
     z.dayPhase = savedGlowPhase;
     z.step(0.001);
     assert(
-      dayGlow === 0 && glowTransition.every((value) => Number.isFinite(value) && value >= 0 && value <= 5) &&
+      dayGlow === 0 && dayGlowBase > 0 && dayGlowBase <= 0.05 && nightGlowBase > 0.99 &&
+        glowTransition.every((value) => Number.isFinite(value) && value >= 0 && value <= 5) &&
+        glowBaseTransition.every((value) => Number.isFinite(value) && value >= dayGlowBase && value <= 1) &&
         glowTransition.some((value) => value > 0 && value < 5) &&
         glowTransition.every((value, index) => index === 0 || value >= glowTransition[index - 1] - 0.000001) &&
+        glowBaseTransition.every((value, index) => index === 0 || value >= glowBaseTransition[index - 1] - 0.000001) &&
         nightGlow > 4.9,
-      'the glow stick has zero daytime emission and follows a finite, bounded darkness ramp into night',
+      'the glow stick has zero daytime emission, a deeply muted daytime base and smooth finite color and emission ramps into night',
     );
     const pilotMeshes = [];
     parts.pilot.traverse((part) => {
@@ -1458,7 +1465,8 @@ async function flightChecks() {
       input.dispatchEvent(new win.Event('input', { bubbles: true }));
     };
     const originalCanopyGeometry = parts.canopySurface.geometry,
-      originalGlowMaterial = parts.glowStick.material;
+      originalGlowMaterial = parts.glowStick.material,
+      originalGlowBaseStrength = parts.glowBaseStrength;
     chooseColor('canopyPrimary', '#62d347');
     chooseColor('canopySecondary', '#d8ebf2');
     chooseColor('canopyPattern', '#293140');
@@ -1479,14 +1487,30 @@ async function flightChecks() {
     assert(
       appearancePanel.querySelector('[data-paraglider-color="glowStick"]').value === '#ff4bd8' &&
         appearancePanel.querySelector('[data-preview-color="glowStick"]').getAttribute('fill') === '#ff4bd8' &&
-        parts.glowStick.material === originalGlowMaterial && parts.glowStick.material.emissiveNode,
+        parts.glowStick.material === originalGlowMaterial && parts.glowStick.material.emissiveNode &&
+        parts.glowBaseStrength === originalGlowBaseStrength,
       'the accessories control accepts an arbitrary glow-stick RGB color without rebuilding its emissive material',
     );
     const glowColors = parts.glowStick.geometry.attributes.color.array;
     assert(
-      glowColors[0] > 0.99 && glowColors[1] < 0.15 && glowColors[2] > 0.6,
-      'the selected user color supplies the glow stick material at day and through its night emission',
+      glowColors[0] > 0.99 && glowColors[1] < 0.15 && glowColors[2] > 0.6 &&
+        z.appearance.colors.glowStick === 0xff4bd8 && rig.userData.appearance.colors.glowStick === 0xff4bd8,
+      'runtime modulation leaves the arbitrary selected and stored glow-stick RGB unchanged',
     );
+    z.dayPhase = 0.5;
+    z.step(0.001);
+    const pinkDayBase = parts.glowBaseStrength.value,
+      pinkDayEmission = parts.glowIntensity.value;
+    z.dayPhase = event('sun', false).phase + 0.12;
+    z.step(0.001);
+    assert(
+      pinkDayEmission === 0 && pinkDayBase <= 0.05 && parts.glowBaseStrength.value > pinkDayBase * 19 &&
+        parts.glowIntensity.value > 4.9 && [parts.glowBaseStrength.value, parts.glowIntensity.value].every(Number.isFinite) &&
+        parts.glowStick.material === originalGlowMaterial && z.appearance.colors.glowStick === 0xff4bd8,
+      'an arbitrary glow color stays muted without emission by day and regains its selected color and luminosity at night without material churn',
+    );
+    z.dayPhase = savedGlowPhase;
+    z.step(0.001);
     const skinColors = parts.skin.geometry.attributes.color.array,
       skinTriples = new Set();
     for (let i = 0; i < skinColors.length; i += 3)

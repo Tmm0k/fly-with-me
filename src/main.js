@@ -611,6 +611,7 @@ const uMoonUp = uniform(0); // the moon is above the horizon
 const uMoonLight = uniform(0); // moonlight strength: night, moon up
 const uNight = uniform(0);
 const uGlowStickIntensity = uniform(0);
+const uGlowStickBaseStrength = uniform(0.04);
 const uLowSun = uniform(0); // the sun sits on the horizon
 const uGlow = uniform(C(0)); // the sun-side horizon band
 const uGlowI = uniform(0);
@@ -2343,8 +2344,9 @@ scene.add(cloudSea);
 // content, but normal flight does not instantiate a personal flock.
 // ---------------------------------------------------------------------------
 const playerMaterial = propMaterial({ basic: { side: THREE.DoubleSide } });
-const glowStickMaterial = propMaterial({
-  emissiveNode: stylize(attribute('color', 'vec3')).mul(uGlowStickIntensity),
+const glowStickColor = stylize(attribute('color', 'vec3'));
+const glowStickMaterial = litMaterial(glowStickColor.mul(uGlowStickBaseStrength), {
+  emissiveNode: glowStickColor.mul(uGlowStickIntensity),
 });
 const paragliderKit = {
   THREE,
@@ -2353,6 +2355,7 @@ const paragliderKit = {
   material: playerMaterial,
   glowMaterial: glowStickMaterial,
   glowIntensity: uGlowStickIntensity,
+  glowBaseStrength: uGlowStickBaseStrength,
 };
 let paragliderAppearance = normalizeParagliderAppearance(storedSettings.paraglider);
 // Keep the long-standing `bird` name for the engine's player pivot and public
@@ -3398,9 +3401,10 @@ function updateAtmosphere(dt) {
   const moonAbove = sstep(-0.02, 0.12, _moonDir.y);
   const moonLight = sstep(-0.09, -0.2, sy) * moonAbove;
   uNight.value = night;
-  // The stick is ordinary colored plastic until the sun is below the night
-  // ramp. Its emissive response then follows the same smooth darkness factor
-  // as the sky, clouds and fog instead of a separate clock.
+  // The stored color stays on the geometry. In daylight the material shows
+  // only a dark trace of it; the existing night ramp restores that color and
+  // adds emission as the world gets dark.
+  uGlowStickBaseStrength.value = 0.04 + night * 0.96;
   uGlowStickIntensity.value = night * 5;
   uSunDir.value.copy(_sunDir);
   uMoonDir.value.copy(_moonDir);
