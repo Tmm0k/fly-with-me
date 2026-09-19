@@ -1243,16 +1243,17 @@ async function flightChecks() {
     let parts = rig.userData.parts;
     assert(
       rig === z.objects.bird && rig.name === 'paraglider' &&
-        ['canopy', 'pilot', 'torso', 'harness', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
+        ['canopy', 'pilot', 'torso', 'harness', 'harnessBackpack', 'glowStick', 'glowStickMount', 'lines', 'leftArm', 'rightArm', 'leftGlove', 'rightGlove', 'risers', 'jacket', 'pants', 'pantsSeat', 'seatedLegs', 'shoes', 'skin', 'headwear', 'sunglasses'].every((name) => parts[name]),
       'the player is a paraglider with separately addressable rig, clothing, skin, headwear, sunglasses, gloves and shoes',
     );
     assert(
-      z.appearanceColors.length === 11 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
+      z.appearanceColors.length === 12 && z.appearanceColors.every((name) => Number.isInteger(colors[name])),
       'every requested paraglider cosmetic has an independent configured color',
     );
     assert(
       z.appearanceColors.every((name) => colors[name] === z.defaultAppearance.colors[name]) &&
-        colors.jacket < 0x303030 && colors.pants === 0x765238 && colors.shoes === 0xf2f0e8 && colors.skin === 0xb98268,
+        colors.jacket < 0x303030 && colors.pants === 0x765238 && colors.shoes === 0xf2f0e8 &&
+        colors.skin === 0xb98268 && colors.glowStick === 0x39ff6a,
       'the default pilot uses the dark top and headwear, brown pants, white shoes and a warm body color',
     );
     assert(
@@ -1262,6 +1263,30 @@ async function flightChecks() {
         parts.pants.children.map((child) => child.name).join() === 'pants-seat,seated-legs' &&
         parts.pants.getObjectByName('seated-legs') !== parts.shoes && parts.harness.parent === parts.pilot,
       'modeled shoe uppers and soles are a distinct pilot feature',
+    );
+    parts.harnessBackpack.geometry.computeBoundingBox();
+    parts.glowStick.geometry.computeBoundingBox();
+    const backpackBox = parts.harnessBackpack.geometry.boundingBox,
+      glowBox = parts.glowStick.geometry.boundingBox;
+    assert(
+      parts.harnessBackpack.parent === parts.harness && parts.glowStickMount.parent === parts.harness &&
+        parts.glowStick.parent === parts.harness && backpackBox.min.z < -0.64 && backpackBox.max.y < 0.75 &&
+        glowBox.max.y - glowBox.min.y > (glowBox.max.x - glowBox.min.x) * 3 &&
+        Math.abs(glowBox.max.x + glowBox.min.x) < 0.000001,
+      'a compact rounded backpack and centered vertical glow stick are attached to the animated harness',
+    );
+    const savedGlowPhase = z.dayPhase;
+    z.dayPhase = 0.5;
+    z.step(0.001);
+    const dayGlow = parts.glowIntensity.value;
+    z.dayPhase = event('sun', false).phase + 0.08;
+    z.step(0.001);
+    const nightGlow = parts.glowIntensity.value;
+    z.dayPhase = savedGlowPhase;
+    z.step(0.001);
+    assert(
+      Number.isFinite(dayGlow) && Number.isFinite(nightGlow) && dayGlow > 0 && nightGlow > dayGlow * 8,
+      'night state raises the glow-stick emissive intensity well above its subtle daylight level',
     );
     const pilotMeshes = [];
     parts.pilot.traverse((part) => {
@@ -1432,14 +1457,21 @@ async function flightChecks() {
     chooseColor('jacket', '#315a7d');
     chooseColor('pants', '#8b5a32');
     chooseColor('shoes', '#e7d36f');
+    chooseColor('glowStick', '#ff4bd8');
     chooseColor('skin', '#f2cf3a');
     appearancePanel.querySelector('[data-skin-preset="4a91d1"]').click();
     parts = rig.userData.parts;
     assert(
       z.appearance.colors.jacket === 0x315a7d && z.appearance.colors.pants === 0x8b5a32 &&
-        z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.skin === 0x4a91d1 &&
+        z.appearance.colors.shoes === 0xe7d36f && z.appearance.colors.glowStick === 0xff4bd8 &&
+        z.appearance.colors.skin === 0x4a91d1 &&
         rig.userData.appearance.colors.pants === 0x8b5a32 && rig.userData.animation === animationState,
       'appearance controls recolor the visible rig without replacing its pivot or maneuver state',
+    );
+    assert(
+      appearancePanel.querySelector('[data-paraglider-color="glowStick"]').value === '#ff4bd8' &&
+        appearancePanel.querySelector('[data-preview-color="glowStick"]').getAttribute('fill') === '#ff4bd8',
+      'the accessories control accepts an arbitrary glow-stick RGB color and updates its preview',
     );
     const skinColors = parts.skin.geometry.attributes.color.array,
       skinTriples = new Set();
@@ -1459,9 +1491,10 @@ async function flightChecks() {
     );
     assert(
       parts.pants?.children.length === 2 && parts.harness?.getObjectByName('harness-shell') && parts.shoes?.children.length === 2 &&
-        [parts.pantsSeat, parts.seatedLegs, ...parts.shoes.children].every((part) =>
+        parts.harnessBackpack?.parent === parts.harness && parts.glowStick?.parent === parts.harness &&
+        [parts.pantsSeat, parts.seatedLegs, parts.harnessBackpack, parts.glowStick, ...parts.shoes.children].every((part) =>
           [...part.geometry.attributes.position.array].every(Number.isFinite)),
-      'appearance rebuilding retains finite pants, harness and modeled shoe geometry',
+      'appearance rebuilding retains finite pants, backpack, glow stick and modeled shoe geometry',
     );
     for (let i = 0; i < 30; i++) z.animateParaglider(0.05, { turnRate: -0.4, time: 24 + i * 0.05 });
     assert(parts.canopy.rotation.z > 0.04 && lineError() < 0.001, 'maneuver animation and moving lines continue after an appearance change');
@@ -1542,6 +1575,7 @@ async function flightChecks() {
     again.z.appearanceColors.every((key) => again.z.appearance.colors[key] === left.appearance[key]) &&
       again.doc.querySelector('[data-paraglider-color="jacket"]').value === '#315a7d' &&
       again.doc.querySelector('[data-paraglider-color="shoes"]').value === '#e7d36f' &&
+      again.doc.querySelector('[data-paraglider-color="glowStick"]').value === '#ff4bd8' &&
       again.doc.querySelector('[data-paraglider-color="skin"]').value === '#4a91d1',
     'paraglider appearance and its controls are restored on reload',
   );
@@ -1581,6 +1615,7 @@ async function flightChecks() {
   damagedSettings.paraglider.colors.jacket = 'not-a-color';
   damagedSettings.paraglider.colors.shoes = 0x1000000;
   damagedSettings.paraglider.colors.skin = -1;
+  damagedSettings.paraglider.colors.glowStick = 'ultraviolet';
   localStorage.setItem('fly-with-me-settings', JSON.stringify(damagedSettings));
   const sanitizedUrl = new URL(location.href);
   sanitizedUrl.searchParams.set('seed', String((left.seed + 2) >>> 0));
@@ -1589,6 +1624,7 @@ async function flightChecks() {
     sanitized.z.appearance.colors.jacket === sanitized.z.defaultAppearance.colors.jacket &&
       sanitized.z.appearance.colors.shoes === sanitized.z.defaultAppearance.colors.shoes &&
       sanitized.z.appearance.colors.skin === sanitized.z.defaultAppearance.colors.skin &&
+      sanitized.z.appearance.colors.glowStick === sanitized.z.defaultAppearance.colors.glowStick &&
       sanitized.z.appearance.colors.pants === left.appearance.pants,
     'invalid stored appearance colors fall back independently without discarding valid choices',
   );

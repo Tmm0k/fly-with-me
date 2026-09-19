@@ -13,6 +13,7 @@ export const DEFAULT_PARAGLIDER = {
     pants: 0x765238,
     helmet: 0x191c21,
     harness: 0x1b2026,
+    glowStick: 0x39ff6a,
     sunglasses: 0x111317,
     gloves: 0x292d32,
     shoes: 0xf2f0e8,
@@ -31,6 +32,7 @@ export const PARAGLIDER_COLOR_KEYS = [
   'pants',
   'helmet',
   'harness',
+  'glowStick',
   'sunglasses',
   'gloves',
   'shoes',
@@ -481,7 +483,7 @@ export function animateParaglider(rig, dt, motion = {}) {
 
 /** Build the visible player rig around the engine-owned flight pivot. */
 export function createParaglider(appearance, kit) {
-  const { THREE, merge, M, material } = kit;
+  const { THREE, merge, M, material, glowMaterial = material, glowIntensity = null } = kit;
   const config = normalizeParagliderAppearance(appearance);
   const colors = config.colors;
   const rig = new THREE.Group();
@@ -516,12 +518,13 @@ export function createParaglider(appearance, kit) {
   const harnessBack = profiledGeometry(
     THREE,
     [
-      { y: -0.02, z: -0.4, rx: 0.22, rz: 0.055 },
-      { y: 0.22, z: -0.44, rx: 0.29, rz: 0.06 },
-      { y: 0.52, z: -0.45, rx: 0.27, rz: 0.055 },
-      { y: 0.68, z: -0.4, rx: 0.18, rz: 0.045 },
+      { y: -0.02, z: -0.44, rx: 0.2, rz: 0.08 },
+      { y: 0.14, z: -0.5, rx: 0.28, rz: 0.12 },
+      { y: 0.4, z: -0.52, rx: 0.3, rz: 0.145 },
+      { y: 0.62, z: -0.48, rx: 0.24, rz: 0.115 },
+      { y: 0.73, z: -0.41, rx: 0.13, rz: 0.065 },
     ],
-    10,
+    12,
   );
   const harnessStraps = [];
   for (const side of [-1, 1]) {
@@ -532,25 +535,49 @@ export function createParaglider(appearance, kit) {
     );
   }
   harnessStraps.push({ ...strut(THREE, [-0.33, 0.08, -0.43], [0.33, 0.08, -0.43], 0.035, 7), color: colors.harness });
-  harness.add(
-    mesh(
-      THREE,
-      merge([
-        { geometry: harnessBack, color: colors.harness },
-        {
-          geometry: profiledGeometry(THREE, [
-            { y: -0.16, z: -0.25, rx: 0.28, rz: 0.1 },
-            { y: -0.27, z: -0.18, rx: 0.37, rz: 0.15 },
-            { y: -0.37, z: -0.02, rx: 0.32, rz: 0.18 },
-          ], 12),
-          color: colors.harness,
-        },
-        ...harnessStraps,
-      ]),
-      material,
-      'harness-shell',
-    ),
+  const harnessBackpack = mesh(THREE, merge([{ geometry: harnessBack, color: colors.harness }]), material, 'harness-backpack');
+  const harnessShell = mesh(
+    THREE,
+    merge([
+      {
+        geometry: profiledGeometry(THREE, [
+          { y: -0.16, z: -0.25, rx: 0.28, rz: 0.1 },
+          { y: -0.27, z: -0.18, rx: 0.37, rz: 0.15 },
+          { y: -0.37, z: -0.02, rx: 0.32, rz: 0.18 },
+        ], 12),
+        color: colors.harness,
+      },
+      ...harnessStraps,
+    ]),
+    material,
+    'harness-shell',
   );
+  const glowStickMount = mesh(
+    THREE,
+    merge([
+      { ...strut(THREE, [-0.07, 0.2, -0.685], [0.07, 0.2, -0.685], 0.018, 7), color: colors.harness },
+      { ...strut(THREE, [-0.07, 0.52, -0.685], [0.07, 0.52, -0.685], 0.018, 7), color: colors.harness },
+      { ...strut(THREE, [-0.065, 0.2, -0.62], [-0.065, 0.2, -0.705], 0.014, 7), color: colors.harness },
+      { ...strut(THREE, [0.065, 0.2, -0.62], [0.065, 0.2, -0.705], 0.014, 7), color: colors.harness },
+      { ...strut(THREE, [-0.065, 0.52, -0.62], [-0.065, 0.52, -0.705], 0.014, 7), color: colors.harness },
+      { ...strut(THREE, [0.065, 0.52, -0.62], [0.065, 0.52, -0.705], 0.014, 7), color: colors.harness },
+    ]),
+    material,
+    'glow-stick-mount',
+  );
+  const glowStick = mesh(
+    THREE,
+    merge([
+      { geometry: new THREE.CylinderGeometry(0.043, 0.043, 0.3, 10), matrix: M(0, 0.36, -0.705), color: colors.glowStick },
+      { geometry: new THREE.SphereGeometry(1, 10, 6), matrix: M(0, 0.51, -0.705, 0.043, 0.043, 0.043), color: colors.glowStick },
+      { geometry: new THREE.SphereGeometry(1, 10, 6), matrix: M(0, 0.21, -0.705, 0.043, 0.043, 0.043), color: colors.glowStick },
+    ]),
+    glowMaterial,
+    'glow-stick',
+  );
+  glowStick.castShadow = false;
+  glowStick.receiveShadow = false;
+  harness.add(harnessShell, harnessBackpack, glowStickMount, glowStick);
   pilot.add(harness);
 
   const jacket = mesh(
@@ -758,6 +785,10 @@ export function createParaglider(appearance, kit) {
     pilot,
     torso,
     harness,
+    harnessBackpack,
+    glowStickMount,
+    glowStick,
+    glowIntensity,
     lines,
     leftArm: left.arm,
     rightArm: right.arm,
